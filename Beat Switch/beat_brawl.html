@@ -5,140 +5,158 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Beat Brawl</title>
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Sora:wght@600;800&family=DM+Sans:wght@400;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;700&family=Inter:wght@400;600&display=swap');
 
-/* ===== PALETTE (low-poly: flat, muted facets; change these to re-theme) =====
-   Each lane has a base colour and a lighter "facet" colour used for the gem's highlight half. */
+/* ===== PALETTE =====
+   One dark base, one cool accent (cyan) and three supporting lane colours. All fills are flat:
+   no glows, no gradients. Change these variables to re-theme the whole game. */
 :root {
-  --bg: #1b2340;        /* deep indigo backdrop */
-  --panel: #232d52;     /* UI surfaces */
-  --sky: #6ec6ff;   --sky-lt: #b4e3ff;     /* lane 0 / hit line / feedback */
-  --coral: #ff7b8a; --coral-lt: #ffc0c7;   /* lane 1 */
-  --amber: #ffd166; --amber-lt: #ffeab0;   /* lane 2 */
-  --mint: #6ee7b7;  --mint-lt: #bdf7de;    /* lane 3 / success */
-  --ink: #f4f7ff;  --muted: #98a6cc;
-  --display: Sora, sans-serif;
+  --bg: #0a0d16;        /* page background */
+  --panel: #131a2b;     /* key buttons, cards, bars */
+  --line: #26304d;      /* thin structural lines (grid, borders) */
+  --cyan: #3dd9eb;      /* lane 0, hit line, main accent */
+  --pink: #ff4d8d;      /* lane 1, boss HP, misses */
+  --yellow: #ffd23f;    /* lane 2, combo */
+  --green: #4ee6a0;     /* lane 3, hits */
+  --ink: #e8ecf8;  --muted: #7f8ba8;
+  --display: "Chakra Petch", sans-serif;   /* headings, HUD numbers, notes */
 }
 * { box-sizing: border-box; }
 html, body { margin: 0; width: 100%; height: 100%; overflow: hidden; background: var(--bg);
-  color: var(--ink); font-family: "DM Sans", sans-serif; }
+  color: var(--ink); font-family: Inter, sans-serif; }
 #game { position: relative; width: 100%; height: 100dvh; isolation: isolate; }
 
-/* ===== BACKGROUND (z-index 0) =====
-   An <svg> that fills the screen. buildBackground() in the script fills it with a mesh of triangles.
-   preserveAspectRatio="xMidYMid slice" (set in the HTML) makes the mesh cover any screen shape. */
+/* ===== BACKGROUND (z-index 0): a plain SVG grid pattern, defined in the HTML ===== */
 #bg { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 0; }
 
-/* ===== HUD: title + boss HP + lives ===== */
+/* ===== HUD: title + sound status (left), boss HP + lives (right) ===== */
 #hud { position: absolute; z-index: 3; inset: 0 0 auto 0; display: flex; justify-content: space-between;
   align-items: flex-start; padding: clamp(12px, 2.5vw, 28px); pointer-events: none; }
-.logo { font: 800 clamp(1.1rem, 3vw, 1.9rem) var(--display); letter-spacing: .04em; }
-.logo i { font-style: normal; color: var(--sky); }
-.small { font-size: clamp(.65rem, 1.5vw, .82rem); color: var(--muted); margin-top: 5px; }
+.logo { font: 700 clamp(1.1rem, 3vw, 1.8rem) var(--display); letter-spacing: .12em; text-transform: uppercase; }
+.logo i { font-style: normal; color: var(--cyan); }
+.small { font-size: clamp(.65rem, 1.5vw, .8rem); color: var(--muted); margin-top: 5px; }
 .stats { width: min(42vw, 310px); display: grid; gap: 10px; }
 .statline { display: flex; justify-content: space-between; gap: 8px; margin-bottom: 5px;
   font-size: clamp(.65rem, 1.5vw, .8rem); color: var(--muted); }
-.statline strong { color: var(--ink); font-family: var(--display); font-weight: 600; }
-/* Bars use a clip-path so their ends are angled (a faceted look) instead of rounded. */
-.bar { height: 10px; background: #12183a; clip-path: polygon(6px 0, 100% 0, calc(100% - 6px) 100%, 0 100%); }
+.statline strong { color: var(--ink); font: 700 1em var(--display); }
+/* Bars: flat rectangles. The inner .fill width is set from JS (updateUI). */
+.bar { height: 8px; background: var(--panel); border: 1px solid var(--line); }
 .fill { height: 100%; width: 100%; transition: width .15s; }
-#bossHealth { background: linear-gradient(90deg, var(--coral), var(--amber)); }
-#lifeBar    { background: linear-gradient(90deg, var(--sky), var(--mint)); }
+#bossHealth { background: var(--pink); }
+#lifeBar { background: var(--cyan); }
 
 /* ===== BOSS (z-index 1) =====
-   Pulse/shake is applied from JS (animateBoss). Colours come from --boss-dark / --boss-light,
-   which applyBoss() sets on the SVG for every boss. */
+   Pulse and shake are applied from JS (animateBoss). Colours come from --boss-dark / --boss-light,
+   which applyBoss() sets on the SVG for each boss. */
 #bossArea { position: absolute; z-index: 1; top: clamp(76px, 13vh, 125px); left: 50%;
   transform: translateX(-50%); text-align: center; width: 100%; pointer-events: none; }
 #bossSvg { width: clamp(100px, 19vw, 190px); height: auto; transform-origin: center; will-change: transform; }
-#bossSvg .f1 { fill: var(--boss-dark); }
-#bossSvg .f2 { fill: var(--boss-light); opacity: .55; }   /* lighter facet = catches the "light" */
-#bossSvg .f3 { fill: var(--boss-dark); filter: brightness(.7); }  /* darker facet = in shadow */
-#bossName { font: 800 clamp(.7rem, 1.8vw, .95rem) var(--display); letter-spacing: .06em; margin-top: 3px; }
-#bossTag { font-size: clamp(.6rem, 1.4vw, .75rem); color: var(--coral-lt); margin-top: 4px; }
+#bossSvg .body { fill: var(--boss-dark); stroke: var(--boss-light); stroke-width: 4; }
+#bossSvg .ink { fill: #0a0d16; }
+#bossSvg .white { fill: #f2f5ff; }
+#bossName { font: 700 clamp(.7rem, 1.8vw, .95rem) var(--display); letter-spacing: .14em; margin-top: 3px; text-transform: uppercase; }
+#bossTag { font-size: clamp(.6rem, 1.4vw, .72rem); color: var(--pink); letter-spacing: .1em; margin-top: 4px; }
 
 /* ===== FALLING NOTES (z-index 2) =====
-   JS sets left (lane) once and top (progress) every frame. translate(-50%,-50%) centres the
-   gem on its lane and on the hit line. The gem shape is a hexagon via clip-path; the two-tone
-   linear-gradient (hard stop at 50%) fakes a light facet and a shadow facet. */
+   JS sets left (lane) once and top (progress) every frame. translate(-50%,-50%) centres each note
+   on its lane and on the hit line. A note is a flat square with one chamfered corner. */
 #fallZone { position: absolute; inset: 0; z-index: 2; pointer-events: none; }
-.note { position: absolute; top: -100px; left: 0; width: clamp(44px, 7vw, 66px); height: clamp(44px, 7vw, 66px);
+.note { position: absolute; top: -100px; left: 0; width: clamp(42px, 7vw, 62px); height: clamp(42px, 7vw, 62px);
   display: grid; place-items: center; transform: translate(-50%, -50%);
-  clip-path: polygon(50% 0, 100% 25%, 100% 75%, 50% 100%, 0 75%, 0 25%);
-  font: 800 clamp(1rem, 2.5vw, 1.3rem) var(--display); color: #1b2340; }
-.note[data-lane="0"] { background: linear-gradient(135deg, var(--sky-lt) 50%, var(--sky) 50%); }
-.note[data-lane="1"] { background: linear-gradient(135deg, var(--coral-lt) 50%, var(--coral) 50%); }
-.note[data-lane="2"] { background: linear-gradient(135deg, var(--amber-lt) 50%, var(--amber) 50%); }
-.note[data-lane="3"] { background: linear-gradient(135deg, var(--mint-lt) 50%, var(--mint) 50%); }
+  clip-path: polygon(0 0, calc(100% - 12px) 0, 100% 12px, 100% 100%, 0 100%);
+  font: 700 clamp(1rem, 2.5vw, 1.3rem) var(--display); color: var(--bg); }
+.note[data-lane="0"] { background: var(--cyan); }
+.note[data-lane="1"] { background: var(--pink); }
+.note[data-lane="2"] { background: var(--yellow); }
+.note[data-lane="3"] { background: var(--green); }
 
-/* Hit line: a note must be pressed when it overlaps this line. Move it with `bottom`. */
+/* Hit line: press a note's key when it overlaps this line. Move it with `bottom`. */
 #hitLine { position: absolute; z-index: 1; left: 5%; right: 5%; bottom: clamp(82px, 13vh, 120px);
-  height: 3px; background: var(--sky); opacity: .7; pointer-events: none; }
+  height: 2px; background: var(--cyan); pointer-events: none; }
 
-/* ===== KEY BUTTONS (clickable on touch screens too) ===== */
+/* ===== KEY BUTTONS (also tappable on touch screens) ===== */
 #keyLabels { position: absolute; z-index: 3; left: 5%; right: 5%; bottom: clamp(28px, 6vh, 58px);
-  display: grid; grid-template-columns: repeat(4, 1fr); gap: clamp(6px, 2vw, 18px); touch-action: manipulation; }
-.key { background: var(--panel); text-align: center; padding: clamp(8px, 2vh, 16px) 4px; user-select: none;
-  font: 800 clamp(1rem, 3vw, 1.5rem) var(--display); transition: .08s;
-  clip-path: polygon(10px 0, 100% 0, calc(100% - 10px) 100%, 0 100%);   /* slanted, faceted edges */
-  border-bottom: 4px solid var(--c); }
-.key:nth-child(1) { --c: var(--sky); }  .key:nth-child(2) { --c: var(--coral); }
-.key:nth-child(3) { --c: var(--amber); } .key:nth-child(4) { --c: var(--mint); }
-.key.active { background: var(--c); color: #1b2340; transform: scale(.96); }
+  display: grid; grid-template-columns: repeat(4, 1fr); gap: clamp(6px, 2vw, 16px); touch-action: manipulation; }
+.key { background: var(--panel); border-top: 3px solid var(--c); text-align: center; user-select: none;
+  padding: clamp(8px, 2vh, 16px) 4px; font: 700 clamp(1rem, 3vw, 1.5rem) var(--display); transition: background .08s;
+  clip-path: polygon(0 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%); }
+.key:nth-child(1) { --c: var(--cyan); }  .key:nth-child(2) { --c: var(--pink); }
+.key:nth-child(3) { --c: var(--yellow); } .key:nth-child(4) { --c: var(--green); }
+.key.active { background: var(--c); color: var(--bg); }
 
 #feedback { position: absolute; z-index: 4; left: 50%; bottom: clamp(150px, 23vh, 220px);
   transform: translateX(-50%); text-align: center; white-space: nowrap; pointer-events: none;
-  font: 800 clamp(.75rem, 2vw, 1rem) var(--display); color: var(--sky); text-shadow: 0 2px 12px #0008; }
+  font: 700 clamp(.75rem, 2vw, 1rem) var(--display); letter-spacing: .08em; text-transform: uppercase; color: var(--cyan); }
 #combo { position: absolute; z-index: 3; right: clamp(12px, 2.5vw, 28px); bottom: clamp(150px, 23vh, 220px);
-  font-size: clamp(.65rem, 1.5vw, .85rem); color: var(--muted); text-align: right; }
-#combo strong { color: var(--amber); font-family: var(--display); }
+  font-size: clamp(.65rem, 1.5vw, .82rem); color: var(--muted); text-align: right; }
+#combo strong { color: var(--yellow); font-family: var(--display); }
 
 /* ===== BOSS-DEATH EFFECT: player ship (triangle) + laser beam, hidden until a boss dies ===== */
-#ship { position: fixed; z-index: 6; width: 0; height: 0; border-left: 15px solid transparent;
-  border-right: 15px solid transparent; border-bottom: 28px solid var(--sky);
+#ship { position: fixed; z-index: 6; width: 0; height: 0; border-left: 14px solid transparent;
+  border-right: 14px solid transparent; border-bottom: 26px solid var(--cyan);
   transform: translateX(-50%); pointer-events: none; }
-#laser { position: fixed; z-index: 6; height: 8px; transform-origin: 0 50%; pointer-events: none;
-  background: linear-gradient(var(--coral) 30%, #fff 30% 70%, var(--coral) 70%); }
+#laser { position: fixed; z-index: 6; height: 5px; background: var(--pink); transform-origin: 0 50%; pointer-events: none; }
 #ship[hidden], #laser[hidden], #banner[hidden], #overlay[hidden] { display: none; }
 
 /* ===== LEVEL BANNER (between bosses) ===== */
 #banner { position: fixed; z-index: 9; inset: 0; display: flex; flex-direction: column; align-items: center;
-  justify-content: center; text-align: center; padding: 24px; background: #1b2340d0; pointer-events: none; }
-#bannerTitle { font: 800 clamp(1.6rem, 7vw, 3.6rem) var(--display); color: var(--sky); animation: pop .5s ease-out; }
-#bannerSub { font: 600 clamp(.9rem, 2.6vw, 1.3rem) var(--display); margin-top: 14px; color: var(--amber);
-  animation: pop .5s .15s ease-out both; }
-#bannerNote { font-size: clamp(.75rem, 1.8vw, .9rem); color: var(--muted); margin-top: 10px;
-  animation: pop .5s .3s ease-out both; }
-@keyframes pop { from { opacity: 0; transform: scale(.7); } to { opacity: 1; transform: scale(1); } }
+  justify-content: center; text-align: center; padding: 24px; background: #0a0d16d9; pointer-events: none; }
+#bannerTitle { font: 700 clamp(1.6rem, 7vw, 3.6rem) var(--display); letter-spacing: .08em; text-transform: uppercase;
+  color: var(--cyan); animation: pop .4s ease-out; }
+#bannerSub { font: 500 clamp(.9rem, 2.6vw, 1.3rem) var(--display); letter-spacing: .1em; margin-top: 14px;
+  color: var(--yellow); animation: pop .4s .1s ease-out both; }
+#bannerNote { font-size: clamp(.75rem, 1.8vw, .9rem); color: var(--muted); margin-top: 10px; animation: pop .4s .2s ease-out both; }
+@keyframes pop { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
 
 /* ===== START / GAME-OVER SCREEN ===== */
 #overlay { position: fixed; z-index: 10; inset: 0; display: flex; align-items: center; justify-content: center;
-  text-align: center; padding: 24px; background: #1b2340e6; cursor: pointer; }
+  text-align: center; padding: 24px; background: #0a0d16f2; cursor: pointer; }
 #overlayContent { max-width: 540px; pointer-events: none; }
-#overlay h1 { font: 800 clamp(2rem, 8vw, 4.4rem) var(--display); letter-spacing: .02em; margin: 0 0 14px; }
-#overlay h1 span { color: var(--sky); }
-#overlay p { color: #c5cde6; line-height: 1.7; font-size: clamp(.85rem, 2vw, 1rem); margin: 0 auto 22px; max-width: 460px; }
-#startHint { display: inline-block; background: var(--sky); color: #1b2340; padding: 16px 32px;
-  font: 800 clamp(.9rem, 2.5vw, 1.15rem) var(--display); animation: hint 1.3s infinite;
-  clip-path: polygon(14px 0, 100% 0, calc(100% - 14px) 100%, 0 100%); }
-@keyframes hint { 50% { transform: scale(1.04); } }
+#overlay h1 { font: 700 clamp(2rem, 8vw, 4.4rem) var(--display); letter-spacing: .1em; text-transform: uppercase; margin: 0 0 14px; }
+#overlay h1 span { color: var(--cyan); }
+#overlay p { color: #b8c0d8; line-height: 1.7; font-size: clamp(.85rem, 2vw, 1rem); margin: 0 auto 22px; max-width: 460px; }
+#startHint { display: inline-block; background: var(--cyan); color: var(--bg); padding: 14px 30px;
+  font: 700 clamp(.9rem, 2.5vw, 1.1rem) var(--display); letter-spacing: .08em; text-transform: uppercase;
+  clip-path: polygon(0 0, calc(100% - 12px) 0, 100% 12px, 100% 100%, 0 100%); }
 #overlay .tiny { font-size: .78rem; color: var(--muted); margin-top: 18px; }
+
+/* ===== STAGE PICKER (on the start screen; cards are built by buildStagePicker()) =====
+   Unselected: dark card with a coloured top edge. Selected (aria-checked="true"): filled with the stage colour. */
+#stagePick { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; margin: 0 auto 22px; pointer-events: auto; }
+.stage { --c: var(--cyan); font: inherit; color: var(--ink); cursor: pointer; border: 0; border-top: 3px solid var(--c);
+  background: var(--panel); padding: 12px 24px; min-width: 160px; text-align: left; transition: background .1s;
+  clip-path: polygon(0 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%); }
+.stage[data-stage="1"] { --c: var(--pink); }
+.stage[data-stage="2"] { --c: var(--yellow); }
+.stage b { display: block; font: 700 1rem var(--display); letter-spacing: .06em; }
+.stage span { display: block; font-size: .75rem; color: var(--muted); margin-top: 3px; }
+.stage:hover { background: #1b2540; }
+.stage:focus-visible { outline: 2px solid var(--ink); outline-offset: -5px; }
+.stage[aria-checked="true"] { background: var(--c); color: var(--bg); }
+.stage[aria-checked="true"] span { color: #0a0d16b0; }
 
 @media (max-height: 560px) {   /* short / landscape phones */
   #bossArea { top: 55px } #bossSvg { width: 95px } #bossTag { display: none }
   #hitLine { bottom: 65px } #keyLabels { bottom: 12px } .key { padding: 6px }
   #feedback, #combo { bottom: 85px }
 }
-@media (prefers-reduced-motion: reduce) { #startHint, #bannerTitle, #bannerSub, #bannerNote { animation: none; } }
+@media (prefers-reduced-motion: reduce) { #bannerTitle, #bannerSub, #bannerNote { animation: none; } }
 </style>
 </head>
 
 <body>
 <main id="game">
 
-  <!-- BACKGROUND SVG: empty here, filled with a low-poly triangle mesh by buildBackground().
-       viewBox 1600x900 is an abstract coordinate grid; "slice" scales it to cover the screen. -->
-  <svg id="bg" viewBox="0 0 1600 900" preserveAspectRatio="xMidYMid slice" aria-hidden="true"></svg>
+  <!-- BACKGROUND SVG: fills the screen. A <pattern> defines one 48x48 grid cell (two thin lines);
+       the <rect> below repeats it across the whole area. No script involved. -->
+  <svg id="bg" aria-hidden="true">
+    <defs>
+      <pattern id="grid" width="48" height="48" patternUnits="userSpaceOnUse">
+        <path d="M48 0H0V48" fill="none" stroke="#161d33" stroke-width="1"/>
+      </pattern>
+    </defs>
+    <rect width="100%" height="100%" fill="url(#grid)"/>
+  </svg>
 
   <!-- HUD (top bar): game title and sound status on the left; boss HP and lives on the right -->
   <header id="hud">
@@ -158,35 +176,20 @@ html, body { margin: 0; width: 100%; height: 100%; overflow: hidden; background:
     </div>
   </header>
 
-  <!-- BOSS ART (SVG, 180x180 viewBox, centred at 90,90).
-       The body is an octagon cut into 8 triangles that all meet at the centre (90,90).
-       Classes f1/f2/f3 are three shades of the boss colour, which is what makes it look low-poly.
-       Face features (brows, eyes, mouth) are flat polygons layered on top.
-       The whole <svg> is scaled/shaken from JS in animateBoss(). -->
+  <!-- BOSS ART (SVG, 180x180 viewBox, centre at 90,90): an angry circle built from 7 simple shapes.
+       The body circle takes its fill/outline from --boss-dark / --boss-light (set per boss in applyBoss).
+       Features sit on top: two slanted brow bars, two eyes (white circle + dark pupil) and a flat mouth.
+       The whole <svg> is scaled and shaken from JS in animateBoss(). -->
   <section id="bossArea" aria-label="Boss">
-    <svg id="bossSvg" viewBox="0 0 180 180" role="img" aria-label="Angry faceted boss">
-      <g id="bossBody">
-        <polygon class="f1" points="90,90 150,115 115,150"/>
-        <polygon class="f2" points="90,90 115,150 65,150"/>
-        <polygon class="f3" points="90,90 65,150 30,115"/>
-        <polygon class="f1" points="90,90 30,115 30,65"/>
-        <polygon class="f2" points="90,90 30,65 65,30"/>
-        <polygon class="f3" points="90,90 65,30 115,30"/>
-        <polygon class="f1" points="90,90 115,30 150,65"/>
-        <polygon class="f2" points="90,90 150,65 150,115"/>
-      </g>
-      <!-- brows: two slanted quads angled toward the middle for an angry look -->
-      <polygon points="46,58 78,70 74,82 44,72" fill="#1b2340"/>
-      <polygon points="102,70 134,58 136,72 106,82" fill="#1b2340"/>
-      <!-- eyes: white diamonds with triangular pupils -->
-      <polygon points="65,76 74,88 65,102 56,88" fill="#f4f7ff"/>
-      <polygon points="115,76 124,88 115,102 106,88" fill="#f4f7ff"/>
-      <polygon points="65,84 69,92 61,92" fill="#1b2340"/>
-      <polygon points="115,84 119,92 111,92" fill="#1b2340"/>
-      <!-- mouth: dark zigzag band with two white fangs -->
-      <polygon points="52,116 128,116 118,136 104,128 90,138 76,128 62,136" fill="#1b2340"/>
-      <polygon points="72,117 84,117 78,128" fill="#f4f7ff"/>
-      <polygon points="96,117 108,117 102,128" fill="#f4f7ff"/>
+    <svg id="bossSvg" viewBox="0 0 180 180" role="img" aria-label="Angry circle boss">
+      <circle class="body" cx="90" cy="90" r="66"/>
+      <path class="ink" d="M46 62 L80 74 L77 84 L44 72 Z"/>        <!-- left brow, slants toward the centre -->
+      <path class="ink" d="M100 74 L134 62 L136 72 L103 84 Z"/>    <!-- right brow (mirror of the left) -->
+      <circle class="white" cx="65" cy="92" r="11"/>               <!-- left eye -->
+      <circle class="white" cx="115" cy="92" r="11"/>              <!-- right eye -->
+      <circle class="ink" cx="67" cy="94" r="5"/>                  <!-- left pupil -->
+      <circle class="ink" cx="113" cy="94" r="5"/>                 <!-- right pupil -->
+      <path class="ink" d="M56 120 H124 L116 138 H64 Z"/>          <!-- mouth: a flat trapezoid -->
     </svg>
     <div id="bossName">THE BEAT FIEND</div>
     <div id="bossTag">RHYTHM DESTROYER</div>
@@ -215,8 +218,11 @@ html, body { margin: 0; width: 100%; height: 100%; overflow: hidden; background:
   <div id="overlay">
     <div id="overlayContent">
       <h1>Beat <span>Brawl</span></h1>
-      <p>Press the matching key the moment a falling gem touches the line. Hit notes to damage the boss. Miss a note
+      <p>Press the matching key the moment a falling note touches the line. Hit notes to damage the boss. Miss a note
         or press the wrong key and you lose a life. Defeat each boss to face a harder one. The music keeps playing until you lose.</p>
+      <!-- STAGE SELECTION: buildStagePicker() fills this with one button per entry in STAGES -->
+      <div class="small" style="margin-bottom:10px">Choose a stage</div>
+      <div id="stagePick" role="radiogroup" aria-label="Choose a stage"></div>
       <div id="startHint">Tap anywhere to play ▶</div>
       <div class="tiny">A S D F keys &nbsp;•&nbsp; 3 lives &nbsp;•&nbsp; Bosses get faster</div>
     </div>
@@ -242,12 +248,7 @@ html, body { margin: 0; width: 100%; height: 100%; overflow: hidden; background:
 
 /* ---------- SETTINGS: safe to edit ---------- */
 const CONFIG = {
-  /* >>> PUT YOUR AUDIO FILE PATH HERE <<<
-     e.g. "mysong.mp3" or "audio/mysong.mp3". Leave "" to use the built-in drum beat. */
-  audioPath: "audio/beat.mp3",
-  baseBpm: 90,          // set to your song's real BPM (constant for the whole run)
-  songFirstBeat: 0,     // seconds of silence before the song's first beat
-  musicVolume: 0.8,     // 0..1
+  musicVolume: 0.8,     // 0..1 (audio file, BPM and intro offset are set per stage in STAGES below)
 
   // Note fall speed, in BEATS (so it stays in sync with the music at any BPM)
   baseTravelBeats: 4,        // boss 1: a note takes 4 beats to fall to the line
@@ -277,18 +278,28 @@ const CONFIG = {
   pulseEverySec: 0.46, pulseStrength: 0.12, pulseDecay: 5
 };
 
+/* STAGES: one entry per selectable stage. The chosen stage decides the music AND the beat grid.
+   >>> PUT YOUR AUDIO FILE PATHS HERE <<<  (leave audioPath "" to use the built-in drum beat)
+   label = name on the card   audioPath = file for this stage   bpm = that song's real BPM (constant for the stage)
+   songFirstBeat = seconds of silence before that song's first beat.
+   Set Stage 2's bpm to match beat_2.mp3, otherwise the notes will not line up with the music. */
+const STAGES = [
+  { label: "Stage 1", audioPath: "audio/beat.mp3",   bpm: 90, songFirstBeat: 0 },
+  { label: "Stage 2", audioPath: "audio/beat_2.mp3", bpm: 90, songFirstBeat: 0 }
+];
+
 /* Lane keys, left to right (same order as the .key divs in the HTML). */
 const keys = ["a", "s", "d", "f"];
 
-/* Boss list; loops after the last one. dark = main facet colour, color = highlight facet colour.
-   These are written to the SVG's CSS variables (--boss-dark / --boss-light) by applyBoss(). */
+/* Boss list; loops back to the first after the last one.
+   dark = body fill, color = outline. They are written to the SVG's CSS variables by applyBoss(). */
 const bosses = [
-  { name: "THE BEAT FIEND", tag: "RHYTHM DESTROYER", dark: "#c2406f", color: "#ff9bb8" },
-  { name: "VOID ORB",       tag: "GALAXY BREAKER",   dark: "#6a45c9", color: "#b7a8ff" },
-  { name: "TOXIC PULSE",    tag: "CHAOS INCARNATE",  dark: "#2f9a5f", color: "#8ff0be" },
-  { name: "SOLAR RAGE",     tag: "STAR EATER",       dark: "#d06a2c", color: "#ffcf91" },
-  { name: "FROSTBYTE",      tag: "COLD-BLOODED",     dark: "#2086b8", color: "#8fe6ff" },
-  { name: "THE END",        tag: "&%#%^G#",          dark: "#2086b8", color: "#222a4a" }
+  { name: "THE BEAT FIEND", tag: "RHYTHM DESTROYER", dark: "#b71f58", color: "#ff8aa9" },
+  { name: "VOID ORB",       tag: "GALAXY BREAKER",   dark: "#5730bb", color: "#a99aff" },
+  { name: "TOXIC PULSE",    tag: "CHAOS INCARNATE",  dark: "#27834f", color: "#7bffb2" },
+  { name: "SOLAR RAGE",     tag: "STAR EATER",       dark: "#bb5522", color: "#ffc078" },
+  { name: "FROSTBYTE",      tag: "COLD-BLOODED",     dark: "#187caa", color: "#80eaff" },
+  { name: "THE END",        tag: "&%#%^G#",          dark: "#187caa", color: "#000000" }
 ];
 
 /* ---------- Page elements (looked up once) ---------- */
@@ -315,52 +326,18 @@ let lastFeedbackAt = 0, shakeUntil = 0;
 let musicOn = false;                 // true from run start until game over
 let dyingStart = 0;                  // timestamp when the boss death animation began (0 = not dying)
 let songMode = "none";               // "buffer" (best timing) | "element" (fallback) | "none" (drums)
-let songLoaded = false, songBuffer = null, songSource = null, songEl = null, songDelay = null;
+let songBuffer = null, songSource = null, songEl = null, songDelay = null;  // the CURRENT stage's song
+const songCache = [];                // per-stage load results, so each file is loaded only once
+let stageIndex = 0;                  // which STAGES entry is selected (0 = Stage 1)
 
 /* The master clock in seconds. Uses the audio clock once it exists. */
 const clock = () => audioCtx ? audioCtx.currentTime : performance.now() / 1000;
-
-/* ===================== BACKGROUND ===================== */
-/* Builds the low-poly mesh inside <svg id="bg">.
-   Method: lay out a jittered grid of points, then split every grid cell into two triangles.
-   Each triangle gets a slightly different shade of blue/violet, which creates the faceted look.
-   A tiny seeded random function makes the mesh identical on every load. */
-function buildBackground() {
-  const svg = $("bg"), NS = "http://www.w3.org/2000/svg";
-  const cols = 10, rows = 6, w = 1600 / cols, h = 900 / rows;
-  let seed = 7;
-  const rand = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
-
-  // 1) grid of points, nudged randomly (edges stay put so the mesh covers the whole canvas)
-  const pts = [];
-  for (let r = 0; r <= rows; r++) {
-    pts[r] = [];
-    for (let c = 0; c <= cols; c++) {
-      const edgeX = c === 0 || c === cols, edgeY = r === 0 || r === rows;
-      pts[r][c] = [c * w + (edgeX ? 0 : (rand() - .5) * w * .7),
-                   r * h + (edgeY ? 0 : (rand() - .5) * h * .7)];
-    }
-  }
-  // 2) two triangles per cell; lightness varies with row (lighter near the top) plus random variation
-  const tri = (a, b, c, r) => {
-    const p = document.createElementNS(NS, "polygon");
-    p.setAttribute("points", [a, b, c].map(q => q.join(",")).join(" "));
-    const light = 17 + (1 - r / rows) * 9 + rand() * 6;                  // % lightness
-    p.setAttribute("fill", `hsl(${228 + rand() * 24} 42% ${light}%)`);   // hue 228-252: blue to violet
-    svg.appendChild(p);
-  };
-  for (let r = 0; r < rows; r++)
-    for (let c = 0; c < cols; c++) {
-      const a = pts[r][c], b = pts[r][c + 1], d = pts[r + 1][c], e = pts[r + 1][c + 1];
-      tri(a, b, d, r); tri(b, e, d, r);
-    }
-}
 
 /* ===================== DIFFICULTY ===================== */
 /* Recalculates every value that depends on bossLevel. This is where "harder each level" lives. */
 function setDifficulty() {
   const lv = bossLevel - 1;
-  bpm = CONFIG.baseBpm;               // tempo is constant so the music plays through every boss
+  bpm = STAGES[stageIndex].bpm;       // tempo comes from the selected stage; constant so music plays through every boss
   beatSec = 60 / bpm;
   travelBeats = Math.max(CONFIG.minTravelBeats, CONFIG.baseTravelBeats - lv * CONFIG.travelBeatsPerLevel);
   travelSec = travelBeats * beatSec;  // seconds a note takes to fall from top to hit line
@@ -415,23 +392,28 @@ function setupAudio() {
   return true;
 }
 
-/* Loads your song once. Preferred: decode into memory (most accurate timing, needs a web server).
+/* Loads the song of stage `i` ONCE and caches it (songCache), so switching stages back and forth is instant.
+   Returns a promise of { mode, buffer, el }.
+   Preferred: decode into memory (most accurate timing, needs a web server).
    Fallback: a normal <audio> element (works from a local file). Last resort: built-in drums. */
-async function loadSong() {
-  if (songLoaded) return;
-  songLoaded = true;
-  if (!CONFIG.audioPath) return;
-  try {
-    const res = await fetch(CONFIG.audioPath);
-    if (!res.ok) throw new Error("not found");
-    songBuffer = await audioCtx.decodeAudioData(await res.arrayBuffer());
-    songMode = "buffer";
-    return;
-  } catch (e) { /* use fallback below */ }
-  songEl = new Audio(CONFIG.audioPath);
-  songEl.loop = true; songEl.preload = "auto"; songEl.volume = CONFIG.musicVolume;
-  songEl.addEventListener("error", songFailed);
-  songMode = "element";
+function loadSong(i) {
+  if (!songCache[i]) songCache[i] = (async () => {
+    const path = STAGES[i].audioPath, song = { mode: "none", buffer: null, el: null };
+    if (!path) return song;
+    try {
+      const res = await fetch(path);
+      if (!res.ok) throw new Error("not found");
+      song.buffer = await audioCtx.decodeAudioData(await res.arrayBuffer());
+      song.mode = "buffer";
+      return song;
+    } catch (e) { /* use fallback below */ }
+    song.el = new Audio(path);
+    song.el.loop = true; song.el.preload = "auto"; song.el.volume = CONFIG.musicVolume;
+    song.el.addEventListener("error", () => { song.mode = "none"; if (songEl === song.el) songFailed(); });
+    song.mode = "element";
+    return song;
+  })();
+  return songCache[i];
 }
 
 function songFailed() {
@@ -442,7 +424,7 @@ function songFailed() {
 /* Starts your song ONCE per run (not per boss). Sets songStart, the time of beat 0. */
 function playSong() {
   const audioStart = audioCtx.currentTime + 0.3;      // short count-in
-  songStart = audioStart + CONFIG.songFirstBeat;
+  songStart = audioStart + STAGES[stageIndex].songFirstBeat;
   if (songMode === "buffer") {
     songSource = audioCtx.createBufferSource();
     songSource.buffer = songBuffer;
@@ -479,13 +461,13 @@ function updateUI() {
 }
 
 /* Shows a feedback message. `hold` = ms before the beat-hint text may replace it. */
-function say(text, color = "var(--sky)", hold = 600) {
+function say(text, color = "var(--cyan)", hold = 600) {
   feedback.textContent = text;
   feedback.style.color = color;
   lastFeedbackAt = performance.now() + hold;
 }
 
-/* Updates boss name/tag and recolours the SVG facets through CSS variables. */
+/* Updates the boss name/tag and recolours the boss SVG through two CSS variables. */
 function applyBoss() {
   const boss = bosses[(bossLevel - 1) % bosses.length];
   $("bossName").textContent = boss.name;
@@ -534,13 +516,13 @@ function animateBoss() {
 }
 
 /* ===================== NOTES ===================== */
-/* Creates one note (a gem div) in `lane`, due to be pressed at audio-clock time `hitTime`.
-   Its horizontal position is fixed to the centre of its key button, so it falls straight onto it.
+/* Creates one note (a square div) in `lane`, due to be pressed at audio-clock time `hitTime`.
+   Its horizontal position is fixed to the centre of its key button, so it falls straight onto it. (Colour and shape come from the .note CSS rules.)
    Its vertical position is updated every frame in frame(). */
 function spawnNote(lane, hitTime) {
   const el = document.createElement("div");
   el.className = "note";
-  el.dataset.lane = lane;               // CSS uses this to colour the gem
+  el.dataset.lane = lane;               // CSS uses this to colour the note
   el.textContent = keys[lane].toUpperCase();
   const r = keyEls[lane].getBoundingClientRect();
   el.style.left = (r.left + r.width / 2) + "px";
@@ -589,7 +571,7 @@ function gameOver() {
 function defeatBoss() {
   running = false; busy = true;
   clearNotes();
-  say("FIRE!", "var(--amber)", 5000);
+  say("FIRE!", "var(--yellow)", 5000);
   const keyRow = $("keyLabels").getBoundingClientRect(), b = bossSvg.getBoundingClientRect();
   const ship = $("ship"), laser = $("laser");
   const sx = keyRow.left + keyRow.width / 2, sy = keyRow.top - 36;   // ship position (start of beam)
@@ -629,7 +611,7 @@ function finishDeath() {
 function loseLife(reason) {
   if (!running) return;
   lives--; combo = 0;
-  say(reason + " · -1 LIFE", "var(--coral)", 900);
+  say(reason + " · -1 LIFE", "var(--pink)", 900);
   tone(90, 0.18, "square", 0.14);
   updateUI();
   if (lives <= 0) gameOver();
@@ -661,7 +643,7 @@ function judge(key) {
     removeNote(chosen);
     shakeUntil = performance.now() + 200;                // boss hit-shake
     tone(620, 0.09, "triangle", 0.13);
-    say((closest <= CONFIG.perfectWindow ? "PERFECT!" : "GOOD!") + ` -${Math.round(damagePerHit * 10) / 10} HP`, "var(--mint)");
+    say((closest <= CONFIG.perfectWindow ? "PERFECT!" : "GOOD!") + ` -${Math.round(damagePerHit * 10) / 10} HP`, "var(--green)");
     updateUI();
     if (bossHp <= 0.001) defeatBoss();
   } else {                                               // ---- MISS ----
@@ -697,7 +679,7 @@ function frame() {
     // Cycle a hint word on each beat unless a hit/miss message is still showing
     const beat = Math.floor((t - songStart) / beatSec);
     if (beat >= 0 && performance.now() > lastFeedbackAt) {
-      feedback.style.color = "var(--sky)";
+      feedback.style.color = "var(--cyan)";
       feedback.textContent = ["Feel the beat", "Stay in time", "Hit the notes", "Keep going"][beat % 4];
     }
   }
@@ -708,8 +690,10 @@ function frame() {
 /* Starts a whole RUN: audio, music (once), then the first boss. Triggered by the start/retry screen. */
 async function startGame() {
   busy = true;
+  document.activeElement.blur();     // so Enter/Space on a stage card can't interfere with play
   if (!setupAudio()) { busy = false; return; }
-  await loadSong();                  // real work only the first time
+  const song = await loadSong(stageIndex);          // this stage's music (cached after the first load)
+  songMode = song.mode; songBuffer = song.buffer; songEl = song.el;
   stopMusic(); clearNotes(); setDifficulty();
   playSong();                        // sets songStart
   nextBeatTime = songStart;          // drum scheduler uses the same beat grid
@@ -730,8 +714,35 @@ function beginBoss() {
   applyBoss(); updateUI();
   const nowBeat = (clock() - songStart) / beatSec;
   nextNoteBeat = Math.ceil((nowBeat + travelBeats) / noteGap) * noteGap;
-  say(`BOSS ${bossLevel} · GET READY`, "var(--sky)", 1200);
+  say(`BOSS ${bossLevel} · GET READY`, "var(--cyan)", 1200);
   running = true; busy = false;
+}
+
+/* ===================== STAGE SELECTION ===================== */
+/* Builds one card per STAGES entry inside #stagePick. Adding a stage to STAGES adds a card automatically. */
+function buildStagePicker() {
+  const box = $("stagePick");
+  STAGES.forEach((st, i) => {
+    const b = document.createElement("button");
+    b.className = "stage"; b.dataset.stage = i; b.setAttribute("role", "radio");
+    b.innerHTML = `<b>${st.label}</b><span>${st.audioPath ? st.audioPath.split("/").pop() : "built-in beat"} · ${st.bpm} BPM</span>`;
+    b.addEventListener("click", () => selectStage(i));
+    box.appendChild(b);
+  });
+  selectStage(0, true);
+}
+
+/* Selects a stage: highlights its card, recalculates timing (BPM) and starts loading its music in the
+   background. Ignored mid-fight. `initial` = true on page load, where no click has happened yet
+   (so audio can't start; it will load when the player first picks a stage or starts). */
+function selectStage(i, initial = false) {
+  if (running || busy) return;
+  stageIndex = i;
+  [...$("stagePick").children].forEach((el, k) => el.setAttribute("aria-checked", k === i));
+  setDifficulty();
+  if (initial) return;
+  soundState.textContent = `♪ ${STAGES[i].label} ready`;
+  if (setupAudio()) loadSong(i);     // a click is a user gesture, so the audio engine may start here
 }
 
 /* ===================== INPUT ===================== */
@@ -740,10 +751,13 @@ document.addEventListener("keydown", e => {
   if (keys.includes(key)) { e.preventDefault(); if (!e.repeat) judge(key); }  // ignore held-key repeats
 });
 keyEls.forEach((el, i) => el.addEventListener("pointerdown", e => { e.preventDefault(); judge(keys[i]); }));
-overlay.addEventListener("click", () => { if (!running && !busy) startGame(); });
+overlay.addEventListener("click", e => {
+  if (e.target.closest("#stagePick")) return;   // clicking a stage card only selects it
+  if (!running && !busy) startGame();
+});
 
 /* ===================== BOOT ===================== */
-buildBackground(); setDifficulty(); applyBoss(); updateUI();
+buildStagePicker(); applyBoss(); updateUI();
 requestAnimationFrame(frame);
 </script>
 </body>
