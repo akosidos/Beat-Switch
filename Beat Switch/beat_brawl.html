@@ -7,758 +7,1170 @@
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;700&family=Inter:wght@400;600&display=swap');
 
-/* ===== PALETTE =====
-   One dark base, one cool accent (cyan) and three supporting lane colours. All fills are flat:
-   no glows, no gradients. Change these variables to re-theme the whole game. */
 :root {
-  --bg: #0a0d16;        /* page background */
-  --panel: #131a2b;     /* key buttons, cards, bars */
-  --line: #26304d;      /* thin structural lines (grid, borders) */
-  --cyan: #3dd9eb;      /* lane 0, hit line, main accent */
-  --pink: #ff4d8d;      /* lane 1, boss HP, misses */
-  --yellow: #ffd23f;    /* lane 2, combo */
-  --green: #4ee6a0;     /* lane 3, hits */
-  --ink: #e8ecf8;  --muted: #7f8ba8;
-  --display: "Chakra Petch", sans-serif;   /* headings, HUD numbers, notes */
+  --color-background: #0a0d16;
+  --color-panel: #131a2b;
+  --color-line: #26304d;
+  --color-cyan: #3dd9eb;
+  --color-pink: #ff4d8d;
+  --color-yellow: #ffd23f;
+  --color-green: #4ee6a0;
+  --color-text: #e8ecf8;
+  --color-muted: #7f8ba8;
+  --font-display: "Chakra Petch", sans-serif;
 }
-* { box-sizing: border-box; }
-html, body { margin: 0; width: 100%; height: 100%; overflow: hidden; background: var(--bg);
-  color: var(--ink); font-family: Inter, sans-serif; }
-#game { position: relative; width: 100%; height: 100dvh; isolation: isolate; }
 
-/* ===== BACKGROUND (z-index 0): a plain SVG grid pattern, defined in the HTML ===== */
-#bg { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 0; }
+* {
+  box-sizing: border-box;
+}
 
-/* ===== HUD: title + sound status (left), boss HP + lives (right) ===== */
-#hud { position: absolute; z-index: 3; inset: 0 0 auto 0; display: flex; justify-content: space-between;
-  align-items: flex-start; padding: clamp(12px, 2.5vw, 28px); pointer-events: none; }
-.logo { font: 700 clamp(1.1rem, 3vw, 1.8rem) var(--display); letter-spacing: .12em; text-transform: uppercase; }
-.logo i { font-style: normal; color: var(--cyan); }
-.small { font-size: clamp(.65rem, 1.5vw, .8rem); color: var(--muted); margin-top: 5px; }
-.stats { width: min(42vw, 310px); display: grid; gap: 10px; }
-.statline { display: flex; justify-content: space-between; gap: 8px; margin-bottom: 5px;
-  font-size: clamp(.65rem, 1.5vw, .8rem); color: var(--muted); }
-.statline strong { color: var(--ink); font: 700 1em var(--display); }
-/* Bars: flat rectangles. The inner .fill width is set from JS (updateUI). */
-.bar { height: 8px; background: var(--panel); border: 1px solid var(--line); }
-.fill { height: 100%; width: 100%; transition: width .15s; }
-#bossHealth { background: var(--pink); }
-#lifeBar { background: var(--cyan); }
+html,
+body {
+  margin: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: var(--color-background);
+  color: var(--color-text);
+  font-family: Inter, sans-serif;
+}
 
-/* ===== BOSS (z-index 1) =====
-   Pulse and shake are applied from JS (animateBoss). Colours come from --boss-dark / --boss-light,
-   which applyBoss() sets on the SVG for each boss. */
-#bossArea { position: absolute; z-index: 1; top: clamp(76px, 13vh, 125px); left: 50%;
-  transform: translateX(-50%); text-align: center; width: 100%; pointer-events: none; }
-#bossSvg { width: clamp(100px, 19vw, 190px); height: auto; transform-origin: center; will-change: transform; }
-#bossSvg .body { fill: var(--boss-dark); stroke: var(--boss-light); stroke-width: 4; }
-#bossSvg .ink { fill: #0a0d16; }
-#bossSvg .white { fill: #f2f5ff; }
-#bossName { font: 700 clamp(.7rem, 1.8vw, .95rem) var(--display); letter-spacing: .14em; margin-top: 3px; text-transform: uppercase; }
-#bossTag { font-size: clamp(.6rem, 1.4vw, .72rem); color: var(--pink); letter-spacing: .1em; margin-top: 4px; }
+#game {
+  position: relative;
+  width: 100%;
+  height: 100dvh;
+  isolation: isolate;
+}
 
-/* ===== FALLING NOTES (z-index 2) =====
-   JS sets left (lane) once and top (progress) every frame. translate(-50%,-50%) centres each note
-   on its lane and on the hit line. A note is a flat square with one chamfered corner. */
-#fallZone { position: absolute; inset: 0; z-index: 2; pointer-events: none; }
-.note { position: absolute; top: -100px; left: 0; width: clamp(42px, 7vw, 62px); height: clamp(42px, 7vw, 62px);
-  display: grid; place-items: center; transform: translate(-50%, -50%);
+#background {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 0;
+}
+
+#hud {
+  position: absolute;
+  z-index: 3;
+  inset: 0 0 auto 0;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  padding: clamp(12px, 2.5vw, 28px);
+  pointer-events: none;
+}
+
+.logo {
+  font: 700 clamp(1.1rem, 3vw, 1.8rem) var(--font-display);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.logo i {
+  font-style: normal;
+  color: var(--color-cyan);
+}
+
+.caption {
+  font-size: clamp(0.65rem, 1.5vw, 0.8rem);
+  color: var(--color-muted);
+  margin-top: 5px;
+}
+
+.stats {
+  width: min(42vw, 310px);
+  display: grid;
+  gap: 10px;
+}
+
+.stat-line {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 5px;
+  font-size: clamp(0.65rem, 1.5vw, 0.8rem);
+  color: var(--color-muted);
+}
+
+.stat-line strong {
+  color: var(--color-text);
+  font: 700 1em var(--font-display);
+}
+
+.bar {
+  height: 8px;
+  background: var(--color-panel);
+  border: 1px solid var(--color-line);
+}
+
+.bar-fill {
+  height: 100%;
+  width: 100%;
+  transition: width 0.15s;
+}
+
+#bossHealthFill {
+  background: var(--color-pink);
+}
+
+#livesFill {
+  background: var(--color-cyan);
+}
+
+#bossArea {
+  position: absolute;
+  z-index: 1;
+  top: clamp(76px, 13vh, 125px);
+  left: 50%;
+  transform: translateX(-50%);
+  text-align: center;
+  width: 100%;
+  pointer-events: none;
+}
+
+#bossGraphic {
+  width: clamp(100px, 19vw, 190px);
+  height: auto;
+  transform-origin: center;
+  will-change: transform;
+}
+
+#bossGraphic .boss-body {
+  fill: var(--boss-fill-color);
+  stroke: var(--boss-outline-color);
+  stroke-width: 4;
+}
+
+#bossGraphic .boss-dark-feature {
+  fill: #0a0d16;
+}
+
+#bossGraphic .boss-white-feature {
+  fill: #f2f5ff;
+}
+
+#bossName {
+  font: 700 clamp(0.7rem, 1.8vw, 0.95rem) var(--font-display);
+  letter-spacing: 0.14em;
+  margin-top: 3px;
+  text-transform: uppercase;
+}
+
+#bossTag {
+  font-size: clamp(0.6rem, 1.4vw, 0.72rem);
+  color: var(--color-pink);
+  letter-spacing: 0.1em;
+  margin-top: 4px;
+}
+
+#fallingNotesLayer {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+}
+
+.note {
+  position: absolute;
+  top: -100px;
+  left: 0;
+  width: clamp(42px, 7vw, 62px);
+  height: clamp(42px, 7vw, 62px);
+  display: grid;
+  place-items: center;
+  transform: translate(-50%, -50%);
   clip-path: polygon(0 0, calc(100% - 12px) 0, 100% 12px, 100% 100%, 0 100%);
-  font: 700 clamp(1rem, 2.5vw, 1.3rem) var(--display); color: var(--bg); }
-.note[data-lane="0"] { background: var(--cyan); }
-.note[data-lane="1"] { background: var(--pink); }
-.note[data-lane="2"] { background: var(--yellow); }
-.note[data-lane="3"] { background: var(--green); }
-
-/* Hit line: press a note's key when it overlaps this line. Move it with `bottom`. */
-#hitLine { position: absolute; z-index: 1; left: 5%; right: 5%; bottom: clamp(82px, 13vh, 120px);
-  height: 2px; background: var(--cyan); pointer-events: none; }
-
-/* ===== KEY BUTTONS (also tappable on touch screens) ===== */
-#keyLabels { position: absolute; z-index: 3; left: 5%; right: 5%; bottom: clamp(28px, 6vh, 58px);
-  display: grid; grid-template-columns: repeat(4, 1fr); gap: clamp(6px, 2vw, 16px); touch-action: manipulation; }
-.key { background: var(--panel); border-top: 3px solid var(--c); text-align: center; user-select: none;
-  padding: clamp(8px, 2vh, 16px) 4px; font: 700 clamp(1rem, 3vw, 1.5rem) var(--display); transition: background .08s;
-  clip-path: polygon(0 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%); }
-.key:nth-child(1) { --c: var(--cyan); }  .key:nth-child(2) { --c: var(--pink); }
-.key:nth-child(3) { --c: var(--yellow); } .key:nth-child(4) { --c: var(--green); }
-.key.active { background: var(--c); color: var(--bg); }
-
-#feedback { position: absolute; z-index: 4; left: 50%; bottom: clamp(150px, 23vh, 220px);
-  transform: translateX(-50%); text-align: center; white-space: nowrap; pointer-events: none;
-  font: 700 clamp(.75rem, 2vw, 1rem) var(--display); letter-spacing: .08em; text-transform: uppercase; color: var(--cyan); }
-#combo { position: absolute; z-index: 3; right: clamp(12px, 2.5vw, 28px); bottom: clamp(150px, 23vh, 220px);
-  font-size: clamp(.65rem, 1.5vw, .82rem); color: var(--muted); text-align: right; }
-#combo strong { color: var(--yellow); font-family: var(--display); }
-
-/* ===== BOSS-DEATH EFFECT: player ship (triangle) + laser beam, hidden until a boss dies ===== */
-#ship { position: fixed; z-index: 6; width: 0; height: 0; border-left: 14px solid transparent;
-  border-right: 14px solid transparent; border-bottom: 26px solid var(--cyan);
-  transform: translateX(-50%); pointer-events: none; }
-#laser { position: fixed; z-index: 6; height: 5px; background: var(--pink); transform-origin: 0 50%; pointer-events: none; }
-#ship[hidden], #laser[hidden], #banner[hidden], #overlay[hidden] { display: none; }
-
-/* ===== LEVEL BANNER (between bosses) ===== */
-#banner { position: fixed; z-index: 9; inset: 0; display: flex; flex-direction: column; align-items: center;
-  justify-content: center; text-align: center; padding: 24px; background: #0a0d16d9; pointer-events: none; }
-#bannerTitle { font: 700 clamp(1.6rem, 7vw, 3.6rem) var(--display); letter-spacing: .08em; text-transform: uppercase;
-  color: var(--cyan); animation: pop .4s ease-out; }
-#bannerSub { font: 500 clamp(.9rem, 2.6vw, 1.3rem) var(--display); letter-spacing: .1em; margin-top: 14px;
-  color: var(--yellow); animation: pop .4s .1s ease-out both; }
-#bannerNote { font-size: clamp(.75rem, 1.8vw, .9rem); color: var(--muted); margin-top: 10px; animation: pop .4s .2s ease-out both; }
-@keyframes pop { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
-
-/* ===== START / GAME-OVER SCREEN ===== */
-#overlay { position: fixed; z-index: 10; inset: 0; display: flex; align-items: center; justify-content: center;
-  text-align: center; padding: 24px; background: #0a0d16f2; cursor: pointer; }
-#overlayContent { max-width: 540px; pointer-events: none; }
-#overlay h1 { font: 700 clamp(2rem, 8vw, 4.4rem) var(--display); letter-spacing: .1em; text-transform: uppercase; margin: 0 0 14px; }
-#overlay h1 span { color: var(--cyan); }
-#overlay p { color: #b8c0d8; line-height: 1.7; font-size: clamp(.85rem, 2vw, 1rem); margin: 0 auto 22px; max-width: 460px; }
-#startHint { display: inline-block; background: var(--cyan); color: var(--bg); padding: 14px 30px;
-  font: 700 clamp(.9rem, 2.5vw, 1.1rem) var(--display); letter-spacing: .08em; text-transform: uppercase;
-  clip-path: polygon(0 0, calc(100% - 12px) 0, 100% 12px, 100% 100%, 0 100%); }
-#overlay .tiny { font-size: .78rem; color: var(--muted); margin-top: 18px; }
-
-/* ===== STAGE PICKER (on the start screen; cards are built by buildStagePicker()) =====
-   Unselected: dark card with a coloured top edge. Selected (aria-checked="true"): filled with the stage colour. */
-#stagePick { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; margin: 0 auto 22px; pointer-events: auto; }
-.stage { --c: var(--cyan); font: inherit; color: var(--ink); cursor: pointer; border: 0; border-top: 3px solid var(--c);
-  background: var(--panel); padding: 12px 24px; min-width: 160px; text-align: left; transition: background .1s;
-  clip-path: polygon(0 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%); }
-.stage[data-stage="1"] { --c: var(--pink); }
-.stage[data-stage="2"] { --c: var(--yellow); }
-.stage b { display: block; font: 700 1rem var(--display); letter-spacing: .06em; }
-.stage span { display: block; font-size: .75rem; color: var(--muted); margin-top: 3px; }
-.stage:hover { background: #1b2540; }
-.stage:focus-visible { outline: 2px solid var(--ink); outline-offset: -5px; }
-.stage[aria-checked="true"] { background: var(--c); color: var(--bg); }
-.stage[aria-checked="true"] span { color: #0a0d16b0; }
-
-@media (max-height: 560px) {   /* short / landscape phones */
-  #bossArea { top: 55px } #bossSvg { width: 95px } #bossTag { display: none }
-  #hitLine { bottom: 65px } #keyLabels { bottom: 12px } .key { padding: 6px }
-  #feedback, #combo { bottom: 85px }
+  font: 700 clamp(1rem, 2.5vw, 1.3rem) var(--font-display);
+  color: var(--color-background);
 }
-@media (prefers-reduced-motion: reduce) { #bannerTitle, #bannerSub, #bannerNote { animation: none; } }
+
+.note[data-lane="0"] { background: var(--color-cyan); }
+.note[data-lane="1"] { background: var(--color-pink); }
+.note[data-lane="2"] { background: var(--color-yellow); }
+.note[data-lane="3"] { background: var(--color-green); }
+
+#hitLine {
+  position: absolute;
+  z-index: 1;
+  left: 5%;
+  right: 5%;
+  bottom: clamp(82px, 13vh, 120px);
+  height: 2px;
+  background: var(--color-cyan);
+  pointer-events: none;
+}
+
+#keyRow {
+  position: absolute;
+  z-index: 3;
+  left: 5%;
+  right: 5%;
+  bottom: clamp(28px, 6vh, 58px);
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: clamp(6px, 2vw, 16px);
+  touch-action: manipulation;
+}
+
+.key {
+  background: var(--color-panel);
+  border-top: 3px solid var(--lane-color);
+  text-align: center;
+  user-select: none;
+  padding: clamp(8px, 2vh, 16px) 4px;
+  font: 700 clamp(1rem, 3vw, 1.5rem) var(--font-display);
+  transition: background 0.08s;
+  clip-path: polygon(0 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%);
+}
+
+.key:nth-child(1) { --lane-color: var(--color-cyan); }
+.key:nth-child(2) { --lane-color: var(--color-pink); }
+.key:nth-child(3) { --lane-color: var(--color-yellow); }
+.key:nth-child(4) { --lane-color: var(--color-green); }
+
+.key.active {
+  background: var(--lane-color);
+  color: var(--color-background);
+}
+
+#feedback {
+  position: absolute;
+  z-index: 4;
+  left: 50%;
+  bottom: clamp(150px, 23vh, 220px);
+  transform: translateX(-50%);
+  text-align: center;
+  white-space: nowrap;
+  pointer-events: none;
+  font: 700 clamp(0.75rem, 2vw, 1rem) var(--font-display);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-cyan);
+}
+
+#comboDisplay {
+  position: absolute;
+  z-index: 3;
+  right: clamp(12px, 2.5vw, 28px);
+  bottom: clamp(150px, 23vh, 220px);
+  font-size: clamp(0.65rem, 1.5vw, 0.82rem);
+  color: var(--color-muted);
+  text-align: right;
+}
+
+#comboDisplay strong {
+  color: var(--color-yellow);
+  font-family: var(--font-display);
+}
+
+#ship {
+  position: fixed;
+  z-index: 6;
+  width: 0;
+  height: 0;
+  border-left: 14px solid transparent;
+  border-right: 14px solid transparent;
+  border-bottom: 26px solid var(--color-cyan);
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+
+#laser {
+  position: fixed;
+  z-index: 6;
+  height: 5px;
+  background: var(--color-pink);
+  transform-origin: 0 50%;
+  pointer-events: none;
+}
+
+#ship[hidden],
+#laser[hidden],
+#banner[hidden],
+#overlay[hidden] {
+  display: none;
+}
+
+#banner {
+  position: fixed;
+  z-index: 9;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 24px;
+  background: rgba(10, 13, 22, 0.85);
+  pointer-events: none;
+}
+
+#bannerTitle {
+  font: 700 clamp(1.6rem, 7vw, 3.6rem) var(--font-display);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-cyan);
+  animation: pop-in 0.4s ease-out;
+}
+
+#bannerSubtitle {
+  font: 500 clamp(0.9rem, 2.6vw, 1.3rem) var(--font-display);
+  letter-spacing: 0.1em;
+  margin-top: 14px;
+  color: var(--color-yellow);
+  animation: pop-in 0.4s 0.1s ease-out both;
+}
+
+#bannerNote {
+  font-size: clamp(0.75rem, 1.8vw, 0.9rem);
+  color: var(--color-muted);
+  margin-top: 10px;
+  animation: pop-in 0.4s 0.2s ease-out both;
+}
+
+@keyframes pop-in {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: none; }
+}
+
+#overlay {
+  position: fixed;
+  z-index: 10;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 24px;
+  background: rgba(10, 13, 22, 0.95);
+  cursor: pointer;
+}
+
+#overlayContent {
+  max-width: 540px;
+  pointer-events: none;
+}
+
+#overlayTitle {
+  font: 700 clamp(2rem, 8vw, 4.4rem) var(--font-display);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  margin: 0 0 14px;
+}
+
+#overlayTitle span {
+  color: var(--color-cyan);
+}
+
+#overlayDescription {
+  color: #b8c0d8;
+  line-height: 1.7;
+  font-size: clamp(0.85rem, 2vw, 1rem);
+  margin: 0 auto 22px;
+  max-width: 460px;
+}
+
+#startHint {
+  display: inline-block;
+  background: var(--color-cyan);
+  color: var(--color-background);
+  padding: 14px 30px;
+  font: 700 clamp(0.9rem, 2.5vw, 1.1rem) var(--font-display);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  clip-path: polygon(0 0, calc(100% - 12px) 0, 100% 12px, 100% 100%, 0 100%);
+}
+
+#overlayFootnote {
+  font-size: 0.78rem;
+  color: var(--color-muted);
+  margin-top: 18px;
+}
+
+#stageChoiceLabel {
+  margin-bottom: 10px;
+}
+
+#stagePicker {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+  flex-wrap: wrap;
+  margin: 0 auto 22px;
+  pointer-events: auto;
+}
+
+.stage-card {
+  --stage-color: var(--color-cyan);
+  font: inherit;
+  color: var(--color-text);
+  cursor: pointer;
+  border: 0;
+  border-top: 3px solid var(--stage-color);
+  background: var(--color-panel);
+  padding: 12px 24px;
+  min-width: 160px;
+  text-align: left;
+  transition: background 0.1s;
+  clip-path: polygon(0 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%);
+}
+
+.stage-card[data-stage="1"] { --stage-color: var(--color-pink); }
+.stage-card[data-stage="2"] { --stage-color: var(--color-yellow); }
+
+.stage-card b {
+  display: block;
+  font: 700 1rem var(--font-display);
+  letter-spacing: 0.06em;
+}
+
+.stage-card span {
+  display: block;
+  font-size: 0.75rem;
+  color: var(--color-muted);
+  margin-top: 3px;
+}
+
+.stage-card:hover {
+  background: #1b2540;
+}
+
+.stage-card:focus-visible {
+  outline: 2px solid var(--color-text);
+  outline-offset: -5px;
+}
+
+.stage-card[aria-checked="true"] {
+  background: var(--stage-color);
+  color: var(--color-background);
+}
+
+.stage-card[aria-checked="true"] span {
+  color: rgba(10, 13, 22, 0.69);
+}
+
+@media (max-height: 560px) {
+  #bossArea { top: 55px; }
+  #bossGraphic { width: 95px; }
+  #bossTag { display: none; }
+  #hitLine { bottom: 65px; }
+  #keyRow { bottom: 12px; }
+  .key { padding: 6px; }
+  #feedback,
+  #comboDisplay { bottom: 85px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #bannerTitle,
+  #bannerSubtitle,
+  #bannerNote {
+    animation: none;
+  }
+}
 </style>
 </head>
 
-<body>
-<main id="game">
+    <body>
+    <main id="game">
 
-  <!-- BACKGROUND SVG: fills the screen. A <pattern> defines one 48x48 grid cell (two thin lines);
-       the <rect> below repeats it across the whole area. No script involved. -->
-  <svg id="bg" aria-hidden="true">
-    <defs>
-      <pattern id="grid" width="48" height="48" patternUnits="userSpaceOnUse">
-        <path d="M48 0H0V48" fill="none" stroke="#161d33" stroke-width="1"/>
-      </pattern>
-    </defs>
-    <rect width="100%" height="100%" fill="url(#grid)"/>
-  </svg>
-
-  <!-- HUD (top bar): game title and sound status on the left; boss HP and lives on the right -->
-  <header id="hud">
-    <div>
-      <div class="logo">Beat <i>Brawl</i></div>
-      <div class="small" id="soundState">♪ Sound ready</div>
-    </div>
-    <div class="stats">
-      <div>
-        <div class="statline"><span id="bossLevelText">BOSS 1</span><strong id="bossHpText">100 / 100 HP</strong></div>
-        <div class="bar"><div class="fill" id="bossHealth"></div></div>
-      </div>
-      <div>
-        <div class="statline"><span>Your lives</span><strong id="livesText">♥ ♥ ♥</strong></div>
-        <div class="bar"><div class="fill" id="lifeBar"></div></div>
-      </div>
-    </div>
-  </header>
-
-  <!-- BOSS ART (SVG, 180x180 viewBox, centre at 90,90): an angry circle built from 7 simple shapes.
-       The body circle takes its fill/outline from --boss-dark / --boss-light (set per boss in applyBoss).
-       Features sit on top: two slanted brow bars, two eyes (white circle + dark pupil) and a flat mouth.
-       The whole <svg> is scaled and shaken from JS in animateBoss(). -->
-  <section id="bossArea" aria-label="Boss">
-    <svg id="bossSvg" viewBox="0 0 180 180" role="img" aria-label="Angry circle boss">
-      <circle class="body" cx="90" cy="90" r="66"/>
-      <path class="ink" d="M46 62 L80 74 L77 84 L44 72 Z"/>        <!-- left brow, slants toward the centre -->
-      <path class="ink" d="M100 74 L134 62 L136 72 L103 84 Z"/>    <!-- right brow (mirror of the left) -->
-      <circle class="white" cx="65" cy="92" r="11"/>               <!-- left eye -->
-      <circle class="white" cx="115" cy="92" r="11"/>              <!-- right eye -->
-      <circle class="ink" cx="67" cy="94" r="5"/>                  <!-- left pupil -->
-      <circle class="ink" cx="113" cy="94" r="5"/>                 <!-- right pupil -->
-      <path class="ink" d="M56 120 H124 L116 138 H64 Z"/>          <!-- mouth: a flat trapezoid -->
+    <svg id="background" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+        <defs>
+        <pattern id="gridPattern" x="0" y="0" width="48" height="48" patternUnits="userSpaceOnUse">
+            <polyline points="48,0 0,0 0,48" fill="none" stroke="#161d33" stroke-width="1" />
+        </pattern>
+        </defs>
+        <rect x="0" y="0" width="100%" height="100%" fill="url(#gridPattern)" />
     </svg>
-    <div id="bossName">THE BEAT FIEND</div>
-    <div id="bossTag">RHYTHM DESTROYER</div>
-  </section>
 
-  <!-- Notes are created by JS and placed inside #fallZone (full-screen layer) -->
-  <div id="fallZone"></div>
-  <div id="ship" hidden></div>   <!-- boss-death ship: small triangle above the keys -->
-  <div id="laser" hidden></div>  <!-- boss-death laser: a rotated, stretched bar -->
-  <div id="hitLine"></div>       <!-- the target line notes must reach -->
-  <div id="feedback">Waiting for the beat</div>
-  <div id="combo">COMBO <strong id="comboText">0</strong><br>BEST <strong id="bestText">0</strong></div>
+    <header id="hud">
+        <div>
+        <div class="logo">Beat <i>Brawl</i></div>
+        <div class="caption" id="soundStatus">♪ Sound ready</div>
+        </div>
+        <div class="stats">
+        <div>
+            <div class="stat-line">
+            <span id="bossLevelText">BOSS 1</span>
+            <strong id="bossHealthText">100 / 100 HP</strong>
+            </div>
+            <div class="bar"><div class="bar-fill" id="bossHealthFill"></div></div>
+        </div>
+        <div>
+            <div class="stat-line">
+            <span>Your lives</span>
+            <strong id="livesText">♥ ♥ ♥</strong>
+            </div>
+            <div class="bar"><div class="bar-fill" id="livesFill"></div></div>
+        </div>
+        </div>
+    </header>
 
-  <!-- Key buttons. To change keys: edit the letters here AND the `keys` array in the script (same order = same lane). -->
-  <div id="keyLabels">
-    <div class="key" data-key="a">A</div>
-    <div class="key" data-key="s">S</div>
-    <div class="key" data-key="d">D</div>
-    <div class="key" data-key="f">F</div>
-  </div>
+    <section id="bossArea" aria-label="Boss">
+        <svg id="bossGraphic" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 180 180" role="img" aria-label="Angry circle boss">
+        <circle class="boss-body" cx="90" cy="90" r="66" />
+        <polygon class="boss-dark-feature" points="46,62 80,74 77,84 44,72" />
+        <polygon class="boss-dark-feature" points="100,74 134,62 136,72 103,84" />
+        <circle class="boss-white-feature" cx="65" cy="92" r="11" />
+        <circle class="boss-white-feature" cx="115" cy="92" r="11" />
+        <circle class="boss-dark-feature" cx="67" cy="94" r="5" />
+        <circle class="boss-dark-feature" cx="113" cy="94" r="5" />
+        <polygon class="boss-dark-feature" points="56,120 124,120 116,138 64,138" />
+        </svg>
+        <div id="bossName">THE BEAT FIEND</div>
+        <div id="bossTag">RHYTHM DESTROYER</div>
+    </section>
 
-  <div id="banner" hidden>
-    <div id="bannerTitle"></div><div id="bannerSub"></div><div id="bannerNote"></div>
-  </div>
+    <div id="fallingNotesLayer"></div>
+    <div id="ship" hidden></div>
+    <div id="laser" hidden></div>
+    <div id="hitLine"></div>
+    <div id="feedback">Waiting for the beat</div>
+    <div id="comboDisplay">COMBO <strong id="comboText">0</strong><br>BEST <strong id="bestComboText">0</strong></div>
 
-  <div id="overlay">
-    <div id="overlayContent">
-      <h1>Beat <span>Brawl</span></h1>
-      <p>Press the matching key the moment a falling note touches the line. Hit notes to damage the boss. Miss a note
-        or press the wrong key and you lose a life. Defeat each boss to face a harder one. The music keeps playing until you lose.</p>
-      <!-- STAGE SELECTION: buildStagePicker() fills this with one button per entry in STAGES -->
-      <div class="small" style="margin-bottom:10px">Choose a stage</div>
-      <div id="stagePick" role="radiogroup" aria-label="Choose a stage"></div>
-      <div id="startHint">Tap anywhere to play ▶</div>
-      <div class="tiny">A S D F keys &nbsp;•&nbsp; 3 lives &nbsp;•&nbsp; Bosses get faster</div>
+    <div id="keyRow">
+        <div class="key" data-key="a">A</div>
+        <div class="key" data-key="s">S</div>
+        <div class="key" data-key="d">D</div>
+        <div class="key" data-key="f">F</div>
     </div>
-  </div>
-</main>
 
-<script>
-/* =====================================================================
-   BEAT BRAWL: how the game works (overview)
-   ---------------------------------------------------------------------
-   1. ONE CLOCK: everything is timed with the Web Audio clock (audioCtx.currentTime, in seconds),
-      so music, falling notes and hit judging never drift apart.
-   2. BEATS: the song is a grid of beats. Beat N happens at  songStart + N * beatSec.
-   3. NOTES: each note has a hitTime (the moment it should be pressed). It is spawned travelSec
-      seconds early and its screen position is computed from the time left until hitTime,
-      so it touches the hit line exactly on its beat on any screen size.
-   4. JUDGING: when a key is pressed we compare the press time to the nearest note's hitTime
-      in that lane. Within hitWindow = HIT (damage boss); otherwise = lose a life.
-      A note that passes hitTime + hitWindow without a press = MISS (lose a life).
-   5. PROGRESSION: boss HP hits 0 -> death animation -> next, harder boss (music never stops).
-      Lives reach 0 -> game over -> music stops and progress resets to boss 1.
-   ===================================================================== */
+    <div id="banner" hidden>
+        <div id="bannerTitle"></div>
+        <div id="bannerSubtitle"></div>
+        <div id="bannerNote"></div>
+    </div>
 
-/* ---------- SETTINGS: safe to edit ---------- */
-const CONFIG = {
-  musicVolume: 0.8,     // 0..1 (audio file, BPM and intro offset are set per stage in STAGES below)
+    <div id="overlay">
+        <div id="overlayContent">
+        <h1 id="overlayTitle">Beat <span>Brawl</span></h1>
+        <p id="overlayDescription">Press the matching key the moment a falling note touches the line. Hit notes to damage the boss. Miss a note
+            or press the wrong key and you lose a life. Defeat each boss to face a harder one. The music keeps playing until you lose.</p>
+        <div class="caption" id="stageChoiceLabel">Choose a stage</div>
+        <div id="stagePicker" role="radiogroup" aria-label="Choose a stage"></div>
+        <div id="startHint">Tap anywhere to play ▶</div>
+        <div id="overlayFootnote">A S D F keys &nbsp;•&nbsp; 3 lives &nbsp;•&nbsp; Bosses get faster</div>
+        </div>
+    </div>
+    </main>
 
-  // Note fall speed, in BEATS (so it stays in sync with the music at any BPM)
-  baseTravelBeats: 4,        // boss 1: a note takes 4 beats to fall to the line
-  travelBeatsPerLevel: 0.4,  // each level shortens the fall (faster notes)
-  minTravelBeats: 2,
+    <script>
+    const CONFIG = {
+    musicVolume: 0.8,
 
-  // Note density
-  noteGapBeats: 2,           // boss 1: one note every 2 beats
-  gapShrinkPerLevel: 0.25,   // each level notes come more often
-  minGapBeats: 0.5,
-  doubleChancePerLevel: 0.1, // chance per level that two notes arrive together
-  maxDoubleChance: 0.5,
+    baseTravelBeats: 4,
+    travelBeatsReductionPerLevel: 0.4,
+    minTravelBeats: 2,
 
-  // Damage: boss always has 100 HP, but your hits get weaker each level
-  damage: 10, damageLossPerLevel: 0.5, minDamage: 3,
+    baseNoteSpacingBeats: 2,
+    noteSpacingReductionPerLevel: 0.25,
+    minNoteSpacingBeats: 0.5,
+    doubleNoteChancePerLevel: 0.1,
+    maxDoubleNoteChance: 0.5,
 
-  // Timing (seconds). Bigger window = more forgiving.
-  hitWindow: 0.15, hitWindowPerLevel: 0.005, minHitWindow: 0.09,
-  perfectWindow: 0.05,
-  inputOffset: 0,            // calibration: hits feel late -> try 0.05; early -> -0.05
+    baseDamage: 10,
+    damageReductionPerLevel: 0.5,
+    minDamage: 3,
 
-  // Flow
-  startLives: 3,             // refilled at the start of every boss
-  transitionMs: 2200,        // how long the "next boss" banner shows
+    baseHitWindowSeconds: 0.15,
+    hitWindowReductionPerLevel: 0.005,
+    minHitWindowSeconds: 0.09,
+    perfectWindowSeconds: 0.05,
+    inputOffsetSeconds: 0,
 
-  // Boss pulse (steady, independent of the song)
-  pulseEverySec: 0.46, pulseStrength: 0.12, pulseDecay: 5
-};
+    startingLives: 3,
+    levelTransitionMs: 2200,
 
-/* STAGES: one entry per selectable stage. The chosen stage decides the music AND the beat grid.
-   >>> PUT YOUR AUDIO FILE PATHS HERE <<<  (leave audioPath "" to use the built-in drum beat)
-   label = name on the card   audioPath = file for this stage   bpm = that song's real BPM (constant for the stage)
-   songFirstBeat = seconds of silence before that song's first beat.
-   Set Stage 2's bpm to match beat_2.mp3, otherwise the notes will not line up with the music. */
-const STAGES = [
-  { label: "Stage 1", audioPath: "audio/beat.mp3",   bpm: 128, songFirstBeat: 0 },
-  { label: "Stage 2", audioPath: "audio/beat_2.mp3", bpm: 156, songFirstBeat: 0 }
-];
+    bossPulseIntervalSeconds: 0.46,
+    bossPulseStrength: 0.12,
+    bossPulseDecay: 5
+    };
 
-/* Lane keys, left to right (same order as the .key divs in the HTML). */
-const keys = ["a", "s", "d", "f"];
+    const STAGES = [
+    { label: "Stage 1", audioPath: "audio/beat.mp3", beatsPerMinute: 128, firstBeatOffsetSeconds: 0 },
+    { label: "Stage 2", audioPath: "audio/beat_2.mp3", beatsPerMinute: 156, firstBeatOffsetSeconds: 0 }
+    ];
 
-/* Boss list; loops back to the first after the last one.
-   dark = body fill, color = outline. They are written to the SVG's CSS variables by applyBoss(). */
-const bosses = [
-  { name: "THE BEAT FIEND", tag: "RHYTHM DESTROYER", dark: "#b71f58", color: "#ff8aa9" },
-  { name: "VOID ORB",       tag: "GALAXY BREAKER",   dark: "#5730bb", color: "#a99aff" },
-  { name: "TOXIC PULSE",    tag: "CHAOS INCARNATE",  dark: "#27834f", color: "#7bffb2" },
-  { name: "SOLAR RAGE",     tag: "STAR EATER",       dark: "#bb5522", color: "#ffc078" },
-  { name: "FROSTBYTE",      tag: "COLD-BLOODED",     dark: "#187caa", color: "#80eaff" },
-  { name: "THE END",        tag: "&%#%^G#",          dark: "#187caa", color: "#000000" }
-];
+    const LANE_KEYS = ["a", "s", "d", "f"];
 
-/* ---------- Page elements (looked up once) ---------- */
-const $ = id => document.getElementById(id);
-const fallZone = $("fallZone"), hitLine = $("hitLine"), overlay = $("overlay"), banner = $("banner");
-const bossSvg = $("bossSvg"), hpEl = $("bossHealth"), hpText = $("bossHpText");
-const lifeText = $("livesText"), lifeBar = $("lifeBar"), feedback = $("feedback"), soundState = $("soundState");
-const keyEls = [...document.querySelectorAll(".key")];
+    const BOSSES = [
+    { name: "THE BEAT FIEND", tagline: "RHYTHM DESTROYER", fillColor: "#b71f58", outlineColor: "#ff8aa9" },
+    { name: "VOID ORB", tagline: "GALAXY BREAKER", fillColor: "#5730bb", outlineColor: "#a99aff" },
+    { name: "TOXIC PULSE", tagline: "CHAOS INCARNATE", fillColor: "#27834f", outlineColor: "#7bffb2" },
+    { name: "SOLAR RAGE", tagline: "STAR EATER", fillColor: "#bb5522", outlineColor: "#ffc078" },
+    { name: "FROSTBYTE", tagline: "COLD-BLOODED", fillColor: "#187caa", outlineColor: "#80eaff" },
+    { name: "THE END", tagline: "&%#%^G#", fillColor: "#187caa", outlineColor: "#000000" }
+    ];
 
-/* ---------- Game state ---------- */
-let running = false;   // true while a boss fight is active
-let busy = false;      // true while loading or showing the banner (blocks start clicks)
-let bossHp = 100, lives = 3, bossLevel = 1, combo = 0, bestCombo = 0;
-let bpm, beatSec, travelBeats, travelSec;            // timing values, set by setDifficulty()
-let noteGap, doubleChance, damagePerHit, hitWindow;  // difficulty values, set by setDifficulty()
-let notes = [];                                      // active notes: { lane, el, hitTime }
+    const BOSS_DEATH_TIMING = { laserDurationMs: 250, burnDurationMs: 900, shrinkDurationMs: 550 };
 
-/* ---------- Timing / audio state ---------- */
-let audioCtx = null, gain = null, songGain = null, musicTimer = null;
-let songStart = 0;                   // audio-clock time of beat 0
-let nextBeatTime = 0, beatIndex = 0; // built-in drum scheduler position
-let nextNoteBeat = 0;                // beat number (may be fractional) of the next note to spawn
-let lastFeedbackAt = 0, shakeUntil = 0;
-let musicOn = false;                 // true from run start until game over
-let dyingStart = 0;                  // timestamp when the boss death animation began (0 = not dying)
-let songMode = "none";               // "buffer" (best timing) | "element" (fallback) | "none" (drums)
-let songBuffer = null, songSource = null, songEl = null, songDelay = null;  // the CURRENT stage's song
-const songCache = [];                // per-stage load results, so each file is loaded only once
-let stageIndex = 0;                  // which STAGES entry is selected (0 = Stage 1)
+    const getById = elementId => document.getElementById(elementId);
 
-/* The master clock in seconds. Uses the audio clock once it exists. */
-const clock = () => audioCtx ? audioCtx.currentTime : performance.now() / 1000;
+    const fallingNotesLayer = getById("fallingNotesLayer");
+    const hitLineElement = getById("hitLine");
+    const overlayElement = getById("overlay");
+    const bannerElement = getById("banner");
+    const bossGraphic = getById("bossGraphic");
+    const bossHealthFill = getById("bossHealthFill");
+    const bossHealthText = getById("bossHealthText");
+    const livesText = getById("livesText");
+    const livesFill = getById("livesFill");
+    const feedbackElement = getById("feedback");
+    const soundStatusElement = getById("soundStatus");
+    const keyElements = [...document.querySelectorAll(".key")];
 
-/* ===================== DIFFICULTY ===================== */
-/* Recalculates every value that depends on bossLevel. This is where "harder each level" lives. */
-function setDifficulty() {
-  const lv = bossLevel - 1;
-  bpm = STAGES[stageIndex].bpm;       // tempo comes from the selected stage; constant so music plays through every boss
-  beatSec = 60 / bpm;
-  travelBeats = Math.max(CONFIG.minTravelBeats, CONFIG.baseTravelBeats - lv * CONFIG.travelBeatsPerLevel);
-  travelSec = travelBeats * beatSec;  // seconds a note takes to fall from top to hit line
-  noteGap = Math.max(CONFIG.minGapBeats, CONFIG.noteGapBeats - lv * CONFIG.gapShrinkPerLevel);
-  doubleChance = Math.min(CONFIG.maxDoubleChance, lv * CONFIG.doubleChancePerLevel);
-  hitWindow = Math.max(CONFIG.minHitWindow, CONFIG.hitWindow - lv * CONFIG.hitWindowPerLevel);
-  damagePerHit = Math.max(CONFIG.minDamage, CONFIG.damage - lv * CONFIG.damageLossPerLevel);
-}
+    let isFightActive = false;
+    let isBusy = false;
+    let bossHealth = 100;
+    let lives = 3;
+    let bossLevel = 1;
+    let currentCombo = 0;
+    let bestCombo = 0;
 
-/* ===================== SOUND ===================== */
-/* Plays one synthesized sound at audio-clock time `when` (0 = now). freq in Hz, type = waveform. */
-function tone(freq, duration = 0.08, type = "triangle", volume = 0.08, when = 0) {
-  if (!audioCtx) return;
-  const t = when || audioCtx.currentTime;
-  const osc = audioCtx.createOscillator(), vol = audioCtx.createGain();
-  osc.type = type;
-  osc.frequency.setValueAtTime(freq, t);
-  vol.gain.setValueAtTime(0.0001, t);                              // quick fade in/out avoids clicks
-  vol.gain.exponentialRampToValueAtTime(volume, t + 0.012);
-  vol.gain.exponentialRampToValueAtTime(0.0001, t + duration);
-  osc.connect(vol); vol.connect(gain);
-  osc.start(t); osc.stop(t + duration + 0.02);
-}
+    let beatsPerMinute;
+    let secondsPerBeat;
+    let travelDurationBeats;
+    let travelDurationSeconds;
+    let noteSpacingBeats;
+    let doubleNoteChance;
+    let damagePerHit;
+    let hitWindowSeconds;
+    let activeNotes = [];
 
-/* Built-in drum scheduler, run every 25 ms. It schedules beats slightly ahead (0.15 s) so timing is
-   sample-accurate. The beat counter always advances, but drums only sound when no song is playing. */
-function scheduleMusic() {
-  if (!musicOn) return;
-  while (nextBeatTime < audioCtx.currentTime + 0.15) {
-    if (songMode === "none") {
-      const b = beatIndex % 4;   // beat 0 = low kick, others = light tick
-      tone(b === 0 ? 110 : 220, b === 0 ? 0.17 : 0.07, b === 0 ? "sawtooth" : "triangle", b === 0 ? 0.16 : 0.07, nextBeatTime);
-      if (b === 2) tone(440, 0.05, "square", 0.035, nextBeatTime);
+    let audioContext = null;
+    let effectsGainNode = null;
+    let songGainNode = null;
+    let musicSchedulerInterval = null;
+    let songStartTime = 0;
+    let nextDrumBeatTime = 0;
+    let drumBeatIndex = 0;
+    let nextNoteBeatNumber = 0;
+    let feedbackHoldUntil = 0;
+    let bossShakeUntil = 0;
+    let isMusicPlaying = false;
+    let bossDeathStartTime = 0;
+    let playbackMode = "none";
+    let songBuffer = null;
+    let songSourceNode = null;
+    let songAudioElement = null;
+    let songStartTimeout = null;
+    const loadedSongs = [];
+    let selectedStageIndex = 0;
+
+    function getAudioClockTime() {
+    return audioContext ? audioContext.currentTime : performance.now() / 1000;
     }
-    beatIndex++;
-    nextBeatTime += beatSec;
-  }
-}
 
-/* Creates the AudioContext once (so the clock never resets) and resumes it after a user gesture. */
-function setupAudio() {
-  const Ctx = window.AudioContext || window.webkitAudioContext;
-  if (!Ctx) { soundState.textContent = "Sound unavailable"; return false; }
-  if (!audioCtx) {
-    audioCtx = new Ctx();
-    gain = audioCtx.createGain();     gain.gain.value = 0.4;                  // volume for built-in sounds
-    gain.connect(audioCtx.destination);
-    songGain = audioCtx.createGain(); songGain.gain.value = CONFIG.musicVolume; // volume for your song
-    songGain.connect(audioCtx.destination);
-  }
-  audioCtx.resume();
-  return true;
-}
-
-/* Loads the song of stage `i` ONCE and caches it (songCache), so switching stages back and forth is instant.
-   Returns a promise of { mode, buffer, el }.
-   Preferred: decode into memory (most accurate timing, needs a web server).
-   Fallback: a normal <audio> element (works from a local file). Last resort: built-in drums. */
-function loadSong(i) {
-  if (!songCache[i]) songCache[i] = (async () => {
-    const path = STAGES[i].audioPath, song = { mode: "none", buffer: null, el: null };
-    if (!path) return song;
-    try {
-      const res = await fetch(path);
-      if (!res.ok) throw new Error("not found");
-      song.buffer = await audioCtx.decodeAudioData(await res.arrayBuffer());
-      song.mode = "buffer";
-      return song;
-    } catch (e) { /* use fallback below */ }
-    song.el = new Audio(path);
-    song.el.loop = true; song.el.preload = "auto"; song.el.volume = CONFIG.musicVolume;
-    song.el.addEventListener("error", () => { song.mode = "none"; if (songEl === song.el) songFailed(); });
-    song.mode = "element";
-    return song;
-  })();
-  return songCache[i];
-}
-
-function songFailed() {
-  songMode = "none";   // drums take over automatically
-  soundState.textContent = "♪ Audio not found: using built-in beat";
-}
-
-/* Starts your song ONCE per run (not per boss). Sets songStart, the time of beat 0. */
-function playSong() {
-  const audioStart = audioCtx.currentTime + 0.3;      // short count-in
-  songStart = audioStart + STAGES[stageIndex].songFirstBeat;
-  if (songMode === "buffer") {
-    songSource = audioCtx.createBufferSource();
-    songSource.buffer = songBuffer;
-    songSource.loop = true;                           // repeats if the run outlasts the song
-    songSource.connect(songGain);
-    songSource.start(audioStart);
-  } else if (songMode === "element") {
-    songEl.pause(); songEl.currentTime = 0; songEl.playbackRate = 1;
-    songDelay = setTimeout(() => songEl.play().catch(songFailed), 300);
-  }
-}
-
-/* Stops all music. Only called on game over and at the start of a new run. */
-function stopMusic() {
-  musicOn = false;
-  if (musicTimer) clearInterval(musicTimer);
-  musicTimer = null;
-  if (songDelay) clearTimeout(songDelay);
-  if (songSource) { try { songSource.stop(); } catch (e) { } songSource = null; }
-  if (songEl) { songEl.pause(); songEl.currentTime = 0; }
-}
-
-/* ===================== UI ===================== */
-/* Syncs the HUD (HP bar, lives, level, combo) with the game state variables. */
-function updateUI() {
-  const hp = Math.ceil(Math.max(0, bossHp - 0.001));
-  hpEl.style.width = hp + "%";
-  hpText.textContent = hp + " / 100 HP";
-  lifeText.textContent = "♥ ".repeat(lives).trim() || "0";
-  lifeBar.style.width = (lives / CONFIG.startLives * 100) + "%";
-  $("bossLevelText").textContent = "BOSS " + bossLevel;
-  $("comboText").textContent = combo;
-  $("bestText").textContent = bestCombo;
-}
-
-/* Shows a feedback message. `hold` = ms before the beat-hint text may replace it. */
-function say(text, color = "var(--cyan)", hold = 600) {
-  feedback.textContent = text;
-  feedback.style.color = color;
-  lastFeedbackAt = performance.now() + hold;
-}
-
-/* Updates the boss name/tag and recolours the boss SVG through two CSS variables. */
-function applyBoss() {
-  const boss = bosses[(bossLevel - 1) % bosses.length];
-  $("bossName").textContent = boss.name;
-  $("bossTag").textContent = boss.tag + " · LVL " + bossLevel;
-  bossSvg.style.setProperty("--boss-dark", boss.dark);
-  bossSvg.style.setProperty("--boss-light", boss.color);
-}
-
-/* Shows the full-screen "next boss" banner. */
-function showBanner(title, sub, note) {
-  $("bannerTitle").textContent = title;
-  $("bannerSub").textContent = sub;
-  $("bannerNote").textContent = note;
-  banner.hidden = false;
-}
-
-/* ===================== BOSS ANIMATION ===================== */
-/* Boss-death animation timings in ms. */
-const DEATH = { laserMs: 250, burnMs: 900, shrinkMs: 550 };
-
-/* Runs every frame and moves the boss SVG with CSS transforms. Three modes:
-   1) Dying: shakes and flickers while the laser burns, then spins, shrinks and fades.
-   2) Pulse: a steady grow-and-settle every CONFIG.pulseEverySec seconds (not tied to the song).
-   3) Hit shake: a short 200 ms horizontal shake after the player hits a note. */
-function animateBoss() {
-  const now = performance.now();
-  if (dyingStart) {
-    const ms = now - dyingStart;
-    const burning = ms > DEATH.laserMs && ms < DEATH.laserMs + DEATH.burnMs;
-    const shakeX = ms < DEATH.laserMs + DEATH.burnMs ? Math.sin(now / 15) * (ms > DEATH.laserMs ? 12 : 3) : 0;
-    let scale = 1, opacity = 1, rot = 0;
-    if (ms > DEATH.laserMs + DEATH.burnMs) {                       // shrink phase
-      const k = Math.min(1, (ms - DEATH.laserMs - DEATH.burnMs) / DEATH.shrinkMs);   // 0 -> 1
-      scale = 1 - k; opacity = 1 - k; rot = k * 360;
+    function getBossForCurrentLevel() {
+    return BOSSES[(bossLevel - 1) % BOSSES.length];
     }
-    bossSvg.style.transform = `translateX(${shakeX}px) scale(${scale}) rotate(${rot}deg)`;
-    bossSvg.style.opacity = opacity;
-    bossSvg.style.filter = burning && Math.floor(ms / 80) % 2 ? "brightness(3)" : "none";
-    return;
-  }
-  const phase = (now / 1000 / CONFIG.pulseEverySec) % 1;                  // 0 at each pulse, rising to 1
-  const scale = 1 + CONFIG.pulseStrength * Math.exp(-phase * CONFIG.pulseDecay);  // fast decay curve
-  const shakeLeft = Math.max(0, (shakeUntil - now) / 200);               // 1 -> 0 over 200 ms
-  const shakeX = Math.sin(now / 12) * 10 * shakeLeft;
-  bossSvg.style.transform = `translateX(${shakeX}px) scale(${scale})`;
-}
 
-/* ===================== NOTES ===================== */
-/* Creates one note (a square div) in `lane`, due to be pressed at audio-clock time `hitTime`.
-   Its horizontal position is fixed to the centre of its key button, so it falls straight onto it. (Colour and shape come from the .note CSS rules.)
-   Its vertical position is updated every frame in frame(). */
-function spawnNote(lane, hitTime) {
-  const el = document.createElement("div");
-  el.className = "note";
-  el.dataset.lane = lane;               // CSS uses this to colour the note
-  el.textContent = keys[lane].toUpperCase();
-  const r = keyEls[lane].getBoundingClientRect();
-  el.style.left = (r.left + r.width / 2) + "px";
-  fallZone.appendChild(el);
-  notes.push({ lane, el, hitTime });
-}
-
-/* Spawns one note in a random lane, or (with probability doubleChance, growing per level) a second
-   note in a DIFFERENT lane at the same time. */
-function spawnWave(hitTime) {
-  const lane = Math.floor(Math.random() * keys.length);
-  spawnNote(lane, hitTime);
-  if (Math.random() < doubleChance) {
-    const other = (lane + 1 + Math.floor(Math.random() * (keys.length - 1))) % keys.length; // never equals `lane`
-    spawnNote(other, hitTime);
-  }
-}
-
-function removeNote(note) { note.el.remove(); notes = notes.filter(n => n !== note); }
-function clearNotes() { notes.forEach(n => n.el.remove()); notes = []; }
-
-/* ===================== GAME FLOW ===================== */
-/* Player ran out of lives: stop music, show the game-over screen, reset progress to boss 1.
-   (bestCombo is kept as a high score.) */
-function gameOver() {
-  const reached = bossLevel;
-  running = false; busy = false;
-  stopMusic();
-  clearNotes();
-  soundState.textContent = "♪ MUSIC STOPPED";
-  overlay.hidden = false;
-  document.querySelector("#overlay h1").innerHTML = 'Game <span>over</span>';
-  document.querySelector("#overlay p").textContent =
-    `You ran out of lives on boss ${reached}. Click anywhere to start over from boss 1. The music restarts from the beginning.`;
-  $("startHint").textContent = "Try again ↻";
-  document.querySelector("#overlay .tiny").textContent = `Best combo ${bestCombo} • Tap anywhere to continue`;
-  bossLevel = 1; combo = 0;
-  setDifficulty();
-  bossHp = 100;
-  applyBoss(); updateUI();
-}
-
-/* Boss HP reached 0: a ship fires a laser at the boss, the boss shakes, spins and shrinks, then
-   finishDeath() starts the next boss. Music is untouched. The laser is a bar anchored at the ship
-   that is rotated to point at the boss and stretched with scaleX(0 -> 1). */
-function defeatBoss() {
-  running = false; busy = true;
-  clearNotes();
-  say("FIRE!", "var(--yellow)", 5000);
-  const keyRow = $("keyLabels").getBoundingClientRect(), b = bossSvg.getBoundingClientRect();
-  const ship = $("ship"), laser = $("laser");
-  const sx = keyRow.left + keyRow.width / 2, sy = keyRow.top - 36;   // ship position (start of beam)
-  const ex = b.left + b.width / 2, ey = b.top + b.height / 2;        // boss centre (end of beam)
-  ship.style.left = sx + "px"; ship.style.top = sy + "px"; ship.hidden = false;
-  laser.hidden = false;
-  laser.style.transition = "none"; laser.style.opacity = 1;
-  laser.style.left = sx + "px"; laser.style.top = (sy - 4) + "px";
-  laser.style.width = Math.hypot(ex - sx, ey - sy) + "px";           // beam length = distance to boss
-  const angle = Math.atan2(ey - sy, ex - sx) * 180 / Math.PI;
-  laser.style.transform = `rotate(${angle}deg) scaleX(0)`;
-  void laser.offsetWidth;                                            // force a reflow so the animation starts at scaleX(0)
-  laser.style.transition = `transform ${DEATH.laserMs}ms linear, opacity .2s`;
-  laser.style.transform = `rotate(${angle}deg) scaleX(1)`;
-  tone(1200, 0.25, "sawtooth", 0.1);                                 // pew
-  tone(150, 0.6, "square", 0.12, audioCtx.currentTime + 0.3);        // boom
-  dyingStart = performance.now();
-  setTimeout(() => { laser.style.opacity = 0; }, DEATH.laserMs + DEATH.burnMs);
-  setTimeout(finishDeath, DEATH.laserMs + DEATH.burnMs + DEATH.shrinkMs + 150);
-}
-
-/* Cleans up the death effects, advances bossLevel, shows the banner, then starts the next fight. */
-function finishDeath() {
-  dyingStart = 0;
-  $("ship").hidden = true; $("laser").hidden = true;
-  bossSvg.style.opacity = 1; bossSvg.style.filter = "none";
-  bossLevel++;
-  setDifficulty();
-  bossHp = 100;
-  applyBoss(); updateUI();
-  const boss = bosses[(bossLevel - 1) % bosses.length];
-  showBanner("Boss defeated!", `LEVEL ${bossLevel} · ${boss.name}`, "More notes · weaker hits · tighter timing");
-  setTimeout(() => { banner.hidden = true; beginBoss(); }, CONFIG.transitionMs);
-}
-
-/* Costs one life and resets the combo. Ends the run at 0 lives. */
-function loseLife(reason) {
-  if (!running) return;
-  lives--; combo = 0;
-  say(reason + " · -1 LIFE", "var(--pink)", 900);
-  tone(90, 0.18, "square", 0.14);
-  updateUI();
-  if (lives <= 0) gameOver();
-}
-
-/* CORE HIT DETECTION. Called on every key press / tap.
-   t = time of the press on the audio clock. We find the note in this lane whose hitTime is
-   closest to t. If |t - hitTime| <= hitWindow it is a hit (PERFECT if within perfectWindow).
-   Otherwise: a note existed but we were too early -> "BAD TIMING"; no note -> "WRONG KEY". */
-function judge(key) {
-  if (!running) return;
-  const lane = keys.indexOf(key);
-  if (lane < 0) return;
-  keyEls[lane].classList.add("active");
-  setTimeout(() => keyEls[lane].classList.remove("active"), 100);
-
-  const t = clock() + CONFIG.inputOffset;
-  let chosen = null, closest = Infinity;
-  for (const n of notes) {
-    if (n.lane !== lane) continue;
-    const d = Math.abs(t - n.hitTime);
-    if (d < closest) { closest = d; chosen = n; }
-  }
-
-  if (chosen && closest <= hitWindow) {                  // ---- HIT ----
-    combo++;
-    bestCombo = Math.max(bestCombo, combo);
-    bossHp = Math.max(0, bossHp - damagePerHit);
-    removeNote(chosen);
-    shakeUntil = performance.now() + 200;                // boss hit-shake
-    tone(620, 0.09, "triangle", 0.13);
-    say((closest <= CONFIG.perfectWindow ? "PERFECT!" : "GOOD!") + ` -${Math.round(damagePerHit * 10) / 10} HP`, "var(--green)");
-    updateUI();
-    if (bossHp <= 0.001) defeatBoss();
-  } else {                                               // ---- MISS ----
-    loseLife(chosen ? "BAD TIMING" : "WRONG KEY");
-  }
-}
-
-/* MAIN LOOP: runs every screen refresh via requestAnimationFrame (also keeps the idle boss pulsing).
-   While a fight is running it does three jobs:
-   (a) SPAWN: a note due at beat B must appear travelSec before its hit time, so we spawn when
-       now >= (songStart + B*beatSec) - travelSec.
-   (b) MOVE: progress = 1 - timeLeft/travelSec (0 at spawn, 1 at the hit line). The note's top is
-       interpolated from just above the screen (-40px) to the hit line's Y. Because position depends
-       on TIME, the note is exactly on the line at hitTime regardless of screen size or frame rate.
-   (c) EXPIRE: if now > hitTime + hitWindow the note can no longer be hit -> remove it and lose a life. */
-function frame() {
-  if (running) {
-    const t = clock();
-    while (t >= songStart + nextNoteBeat * beatSec - travelSec) {        // (a) spawn
-      spawnWave(songStart + nextNoteBeat * beatSec);
-      nextNoteBeat += noteGap;
+    function applyDifficultyForCurrentLevel() {
+    const levelsCompleted = bossLevel - 1;
+    beatsPerMinute = STAGES[selectedStageIndex].beatsPerMinute;
+    secondsPerBeat = 60 / beatsPerMinute;
+    travelDurationBeats = Math.max(
+        CONFIG.minTravelBeats,
+        CONFIG.baseTravelBeats - levelsCompleted * CONFIG.travelBeatsReductionPerLevel
+    );
+    travelDurationSeconds = travelDurationBeats * secondsPerBeat;
+    noteSpacingBeats = Math.max(
+        CONFIG.minNoteSpacingBeats,
+        CONFIG.baseNoteSpacingBeats - levelsCompleted * CONFIG.noteSpacingReductionPerLevel
+    );
+    doubleNoteChance = Math.min(
+        CONFIG.maxDoubleNoteChance,
+        levelsCompleted * CONFIG.doubleNoteChancePerLevel
+    );
+    hitWindowSeconds = Math.max(
+        CONFIG.minHitWindowSeconds,
+        CONFIG.baseHitWindowSeconds - levelsCompleted * CONFIG.hitWindowReductionPerLevel
+    );
+    damagePerHit = Math.max(
+        CONFIG.minDamage,
+        CONFIG.baseDamage - levelsCompleted * CONFIG.damageReductionPerLevel
+    );
     }
-    const hitY = hitLine.getBoundingClientRect().top;
-    for (const n of [...notes]) {                                        // copy: we may remove while looping
-      const progress = 1 - (n.hitTime - t) / travelSec;                  // (b) move
-      n.el.style.top = (-40 + (hitY + 40) * progress) + "px";
-      if (t > n.hitTime + hitWindow) {                                   // (c) expire
-        removeNote(n);
-        loseLife("MISSED NOTE");
-        if (!running) break;
-      }
+
+    function playTone(frequencyHz, durationSeconds = 0.08, waveform = "triangle", volume = 0.08, startTime = 0) {
+    if (!audioContext) return;
+    const scheduledTime = startTime || audioContext.currentTime;
+    const oscillator = audioContext.createOscillator();
+    const volumeEnvelope = audioContext.createGain();
+    oscillator.type = waveform;
+    oscillator.frequency.setValueAtTime(frequencyHz, scheduledTime);
+    volumeEnvelope.gain.setValueAtTime(0.0001, scheduledTime);
+    volumeEnvelope.gain.exponentialRampToValueAtTime(volume, scheduledTime + 0.012);
+    volumeEnvelope.gain.exponentialRampToValueAtTime(0.0001, scheduledTime + durationSeconds);
+    oscillator.connect(volumeEnvelope);
+    volumeEnvelope.connect(effectsGainNode);
+    oscillator.start(scheduledTime);
+    oscillator.stop(scheduledTime + durationSeconds + 0.02);
     }
-    // Cycle a hint word on each beat unless a hit/miss message is still showing
-    const beat = Math.floor((t - songStart) / beatSec);
-    if (beat >= 0 && performance.now() > lastFeedbackAt) {
-      feedback.style.color = "var(--cyan)";
-      feedback.textContent = ["Feel the beat", "Stay in time", "Hit the notes", "Keep going"][beat % 4];
+
+    function scheduleDrumBeats() {
+    if (!isMusicPlaying) return;
+    const scheduleAheadSeconds = 0.15;
+    while (nextDrumBeatTime < audioContext.currentTime + scheduleAheadSeconds) {
+        if (playbackMode === "none") {
+        const beatInBar = drumBeatIndex % 4;
+        const isDownbeat = beatInBar === 0;
+        playTone(
+            isDownbeat ? 110 : 220,
+            isDownbeat ? 0.17 : 0.07,
+            isDownbeat ? "sawtooth" : "triangle",
+            isDownbeat ? 0.16 : 0.07,
+            nextDrumBeatTime
+        );
+        if (beatInBar === 2) {
+            playTone(440, 0.05, "square", 0.035, nextDrumBeatTime);
+        }
+        }
+        drumBeatIndex++;
+        nextDrumBeatTime += secondsPerBeat;
     }
-  }
-  animateBoss();
-  requestAnimationFrame(frame);
-}
+    }
 
-/* Starts a whole RUN: audio, music (once), then the first boss. Triggered by the start/retry screen. */
-async function startGame() {
-  busy = true;
-  document.activeElement.blur();     // so Enter/Space on a stage card can't interfere with play
-  if (!setupAudio()) { busy = false; return; }
-  const song = await loadSong(stageIndex);          // this stage's music (cached after the first load)
-  songMode = song.mode; songBuffer = song.buffer; songEl = song.el;
-  stopMusic(); clearNotes(); setDifficulty();
-  playSong();                        // sets songStart
-  nextBeatTime = songStart;          // drum scheduler uses the same beat grid
-  beatIndex = 0; musicOn = true;
-  scheduleMusic();
-  musicTimer = setInterval(scheduleMusic, 25);
-  soundState.textContent = songMode === "none" ? "♪ BEAT PLAYING" : "♪ MUSIC PLAYING";
-  beginBoss();
-}
+    function setupAudio() {
+    const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+    if (!AudioContextClass) {
+        soundStatusElement.textContent = "Sound unavailable";
+        return false;
+    }
+    if (!audioContext) {
+        audioContext = new AudioContextClass();
+        effectsGainNode = audioContext.createGain();
+        effectsGainNode.gain.value = 0.4;
+        effectsGainNode.connect(audioContext.destination);
+        songGainNode = audioContext.createGain();
+        songGainNode.gain.value = CONFIG.musicVolume;
+        songGainNode.connect(audioContext.destination);
+    }
+    audioContext.resume();
+    return true;
+    }
 
-/* Starts the fight for the CURRENT bossLevel (first boss, and after each defeat). Doesn't touch music.
-   The first note is placed on the first allowed beat far enough ahead for a full fall, measured from
-   wherever the song is right now (so later bosses join the music mid-song). */
-function beginBoss() {
-  setDifficulty(); clearNotes();
-  bossHp = 100; lives = CONFIG.startLives; combo = 0;
-  overlay.hidden = true;
-  applyBoss(); updateUI();
-  const nowBeat = (clock() - songStart) / beatSec;
-  nextNoteBeat = Math.ceil((nowBeat + travelBeats) / noteGap) * noteGap;
-  say(`BOSS ${bossLevel} · GET READY`, "var(--cyan)", 1200);
-  running = true; busy = false;
-}
+    function loadSong(stageIndex) {
+    if (!loadedSongs[stageIndex]) {
+        loadedSongs[stageIndex] = (async () => {
+        const audioPath = STAGES[stageIndex].audioPath;
+        const song = { mode: "none", buffer: null, audioElement: null };
+        if (!audioPath) return song;
 
-/* ===================== STAGE SELECTION ===================== */
-/* Builds one card per STAGES entry inside #stagePick. Adding a stage to STAGES adds a card automatically. */
-function buildStagePicker() {
-  const box = $("stagePick");
-  STAGES.forEach((st, i) => {
-    const b = document.createElement("button");
-    b.className = "stage"; b.dataset.stage = i; b.setAttribute("role", "radio");
-    b.innerHTML = `<b>${st.label}</b><span>${st.audioPath ? st.audioPath.split("/").pop() : "built-in beat"} · ${st.bpm} BPM</span>`;
-    b.addEventListener("click", () => selectStage(i));
-    box.appendChild(b);
-  });
-  selectStage(0, true);
-}
+        try {
+            const response = await fetch(audioPath);
+            if (!response.ok) throw new Error("Audio file not found");
+            song.buffer = await audioContext.decodeAudioData(await response.arrayBuffer());
+            song.mode = "buffer";
+            return song;
+        } catch (error) {
+            song.audioElement = new Audio(audioPath);
+        }
 
-/* Selects a stage: highlights its card, recalculates timing (BPM) and starts loading its music in the
-   background. Ignored mid-fight. `initial` = true on page load, where no click has happened yet
-   (so audio can't start; it will load when the player first picks a stage or starts). */
-function selectStage(i, initial = false) {
-  if (running || busy) return;
-  stageIndex = i;
-  [...$("stagePick").children].forEach((el, k) => el.setAttribute("aria-checked", k === i));
-  setDifficulty();
-  if (initial) return;
-  soundState.textContent = `♪ ${STAGES[i].label} ready`;
-  if (setupAudio()) loadSong(i);     // a click is a user gesture, so the audio engine may start here
-}
+        song.audioElement.loop = true;
+        song.audioElement.preload = "auto";
+        song.audioElement.volume = CONFIG.musicVolume;
+        song.audioElement.addEventListener("error", () => {
+            song.mode = "none";
+            if (songAudioElement === song.audioElement) handleSongLoadFailure();
+        });
+        song.mode = "element";
+        return song;
+        })();
+    }
+    return loadedSongs[stageIndex];
+    }
 
-/* ===================== INPUT ===================== */
-document.addEventListener("keydown", e => {
-  const key = e.key.toLowerCase();
-  if (keys.includes(key)) { e.preventDefault(); if (!e.repeat) judge(key); }  // ignore held-key repeats
-});
-keyEls.forEach((el, i) => el.addEventListener("pointerdown", e => { e.preventDefault(); judge(keys[i]); }));
-overlay.addEventListener("click", e => {
-  if (e.target.closest("#stagePick")) return;   // clicking a stage card only selects it
-  if (!running && !busy) startGame();
-});
+    function handleSongLoadFailure() {
+    playbackMode = "none";
+    soundStatusElement.textContent = "♪ Audio not found: using built-in beat";
+    }
 
-/* ===================== BOOT ===================== */
-buildStagePicker(); applyBoss(); updateUI();
-requestAnimationFrame(frame);
-</script>
-</body>
+    function playSong() {
+    const audioStartTime = audioContext.currentTime + 0.3;
+    songStartTime = audioStartTime + STAGES[selectedStageIndex].firstBeatOffsetSeconds;
+
+    if (playbackMode === "buffer") {
+        songSourceNode = audioContext.createBufferSource();
+        songSourceNode.buffer = songBuffer;
+        songSourceNode.loop = true;
+        songSourceNode.connect(songGainNode);
+        songSourceNode.start(audioStartTime);
+    } else if (playbackMode === "element") {
+        songAudioElement.pause();
+        songAudioElement.currentTime = 0;
+        songAudioElement.playbackRate = 1;
+        songStartTimeout = setTimeout(() => songAudioElement.play().catch(handleSongLoadFailure), 300);
+    }
+    }
+
+    function stopMusic() {
+    isMusicPlaying = false;
+    if (musicSchedulerInterval) clearInterval(musicSchedulerInterval);
+    musicSchedulerInterval = null;
+    if (songStartTimeout) clearTimeout(songStartTimeout);
+    if (songSourceNode) {
+        try {
+        songSourceNode.stop();
+        } catch (error) {
+        songSourceNode = null;
+        }
+        songSourceNode = null;
+    }
+    if (songAudioElement) {
+        songAudioElement.pause();
+        songAudioElement.currentTime = 0;
+    }
+    }
+
+    function updateHud() {
+    const displayedHealth = Math.ceil(Math.max(0, bossHealth - 0.001));
+    bossHealthFill.style.width = displayedHealth + "%";
+    bossHealthText.textContent = displayedHealth + " / 100 HP";
+    livesText.textContent = "♥ ".repeat(lives).trim() || "0";
+    livesFill.style.width = (lives / CONFIG.startingLives * 100) + "%";
+    getById("bossLevelText").textContent = "BOSS " + bossLevel;
+    getById("comboText").textContent = currentCombo;
+    getById("bestComboText").textContent = bestCombo;
+    }
+
+    function showFeedback(message, color = "var(--color-cyan)", holdMs = 600) {
+    feedbackElement.textContent = message;
+    feedbackElement.style.color = color;
+    feedbackHoldUntil = performance.now() + holdMs;
+    }
+
+    function applyBossAppearance() {
+    const boss = getBossForCurrentLevel();
+    getById("bossName").textContent = boss.name;
+    getById("bossTag").textContent = boss.tagline + " · LVL " + bossLevel;
+    bossGraphic.style.setProperty("--boss-fill-color", boss.fillColor);
+    bossGraphic.style.setProperty("--boss-outline-color", boss.outlineColor);
+    }
+
+    function showBanner(title, subtitle, note) {
+    getById("bannerTitle").textContent = title;
+    getById("bannerSubtitle").textContent = subtitle;
+    getById("bannerNote").textContent = note;
+    bannerElement.hidden = false;
+    }
+
+    function animateBoss() {
+    const currentTime = performance.now();
+
+    if (bossDeathStartTime) {
+        const elapsedMs = currentTime - bossDeathStartTime;
+        const burnStartMs = BOSS_DEATH_TIMING.laserDurationMs;
+        const shrinkStartMs = burnStartMs + BOSS_DEATH_TIMING.burnDurationMs;
+        const isBurning = elapsedMs > burnStartMs && elapsedMs < shrinkStartMs;
+        const shakeAmplitude = elapsedMs > burnStartMs ? 12 : 3;
+        const horizontalShake = elapsedMs < shrinkStartMs ? Math.sin(currentTime / 15) * shakeAmplitude : 0;
+        let scale = 1;
+        let opacity = 1;
+        let rotationDegrees = 0;
+
+        if (elapsedMs > shrinkStartMs) {
+        const shrinkProgress = Math.min(1, (elapsedMs - shrinkStartMs) / BOSS_DEATH_TIMING.shrinkDurationMs);
+        scale = 1 - shrinkProgress;
+        opacity = 1 - shrinkProgress;
+        rotationDegrees = shrinkProgress * 360;
+        }
+
+        bossGraphic.style.transform = `translateX(${horizontalShake}px) scale(${scale}) rotate(${rotationDegrees}deg)`;
+        bossGraphic.style.opacity = opacity;
+        bossGraphic.style.filter = isBurning && Math.floor(elapsedMs / 80) % 2 ? "brightness(3)" : "none";
+        return;
+    }
+
+    const pulsePhase = (currentTime / 1000 / CONFIG.bossPulseIntervalSeconds) % 1;
+    const pulseScale = 1 + CONFIG.bossPulseStrength * Math.exp(-pulsePhase * CONFIG.bossPulseDecay);
+    const remainingShakeFraction = Math.max(0, (bossShakeUntil - currentTime) / 200);
+    const horizontalShake = Math.sin(currentTime / 12) * 10 * remainingShakeFraction;
+    bossGraphic.style.transform = `translateX(${horizontalShake}px) scale(${pulseScale})`;
+    }
+
+    function spawnNote(lane, hitTime) {
+    const noteElement = document.createElement("div");
+    noteElement.className = "note";
+    noteElement.dataset.lane = lane;
+    noteElement.textContent = LANE_KEYS[lane].toUpperCase();
+    const keyBounds = keyElements[lane].getBoundingClientRect();
+    noteElement.style.left = (keyBounds.left + keyBounds.width / 2) + "px";
+    fallingNotesLayer.appendChild(noteElement);
+    activeNotes.push({ lane, element: noteElement, hitTime });
+    }
+
+    function spawnNoteWave(hitTime) {
+    const firstLane = Math.floor(Math.random() * LANE_KEYS.length);
+    spawnNote(firstLane, hitTime);
+    if (Math.random() < doubleNoteChance) {
+        const laneOffset = 1 + Math.floor(Math.random() * (LANE_KEYS.length - 1));
+        const secondLane = (firstLane + laneOffset) % LANE_KEYS.length;
+        spawnNote(secondLane, hitTime);
+    }
+    }
+
+    function removeNote(noteToRemove) {
+    noteToRemove.element.remove();
+    activeNotes = activeNotes.filter(note => note !== noteToRemove);
+    }
+
+    function clearAllNotes() {
+    activeNotes.forEach(note => note.element.remove());
+    activeNotes = [];
+    }
+
+    function gameOver() {
+    const bossLevelReached = bossLevel;
+    isFightActive = false;
+    isBusy = false;
+    stopMusic();
+    clearAllNotes();
+    soundStatusElement.textContent = "♪ MUSIC STOPPED";
+    overlayElement.hidden = false;
+    getById("overlayTitle").innerHTML = 'Game <span>over</span>';
+    getById("overlayDescription").textContent =
+        `You ran out of lives on boss ${bossLevelReached}. Click anywhere to start over from boss 1. The music restarts from the beginning.`;
+    getById("startHint").textContent = "Try again ↻";
+    getById("overlayFootnote").textContent = `Best combo ${bestCombo} • Tap anywhere to continue`;
+    bossLevel = 1;
+    currentCombo = 0;
+    applyDifficultyForCurrentLevel();
+    bossHealth = 100;
+    applyBossAppearance();
+    updateHud();
+    }
+
+    function defeatBoss() {
+    isFightActive = false;
+    isBusy = true;
+    clearAllNotes();
+    showFeedback("FIRE!", "var(--color-yellow)", 5000);
+
+    const keyRowBounds = getById("keyRow").getBoundingClientRect();
+    const bossBounds = bossGraphic.getBoundingClientRect();
+    const shipElement = getById("ship");
+    const laserElement = getById("laser");
+    const shipX = keyRowBounds.left + keyRowBounds.width / 2;
+    const shipY = keyRowBounds.top - 36;
+    const bossCenterX = bossBounds.left + bossBounds.width / 2;
+    const bossCenterY = bossBounds.top + bossBounds.height / 2;
+
+    shipElement.style.left = shipX + "px";
+    shipElement.style.top = shipY + "px";
+    shipElement.hidden = false;
+
+    laserElement.hidden = false;
+    laserElement.style.transition = "none";
+    laserElement.style.opacity = 1;
+    laserElement.style.left = shipX + "px";
+    laserElement.style.top = (shipY - 4) + "px";
+    laserElement.style.width = Math.hypot(bossCenterX - shipX, bossCenterY - shipY) + "px";
+
+    const laserAngleDegrees = Math.atan2(bossCenterY - shipY, bossCenterX - shipX) * 180 / Math.PI;
+    laserElement.style.transform = `rotate(${laserAngleDegrees}deg) scaleX(0)`;
+    void laserElement.offsetWidth;
+    laserElement.style.transition = `transform ${BOSS_DEATH_TIMING.laserDurationMs}ms linear, opacity 0.2s`;
+    laserElement.style.transform = `rotate(${laserAngleDegrees}deg) scaleX(1)`;
+
+    playTone(1200, 0.25, "sawtooth", 0.1);
+    playTone(150, 0.6, "square", 0.12, audioContext.currentTime + 0.3);
+
+    bossDeathStartTime = performance.now();
+    const laserFadeDelayMs = BOSS_DEATH_TIMING.laserDurationMs + BOSS_DEATH_TIMING.burnDurationMs;
+    setTimeout(() => { laserElement.style.opacity = 0; }, laserFadeDelayMs);
+    setTimeout(finishBossDeath, laserFadeDelayMs + BOSS_DEATH_TIMING.shrinkDurationMs + 150);
+    }
+
+    function finishBossDeath() {
+    bossDeathStartTime = 0;
+    getById("ship").hidden = true;
+    getById("laser").hidden = true;
+    bossGraphic.style.opacity = 1;
+    bossGraphic.style.filter = "none";
+    bossLevel++;
+    applyDifficultyForCurrentLevel();
+    bossHealth = 100;
+    applyBossAppearance();
+    updateHud();
+    const nextBoss = getBossForCurrentLevel();
+    showBanner("Boss defeated!", `LEVEL ${bossLevel} · ${nextBoss.name}`, "More notes · weaker hits · tighter timing");
+    setTimeout(() => {
+        bannerElement.hidden = true;
+        beginBossFight();
+    }, CONFIG.levelTransitionMs);
+    }
+
+    function loseLife(reason) {
+    if (!isFightActive) return;
+    lives--;
+    currentCombo = 0;
+    showFeedback(reason + " · -1 LIFE", "var(--color-pink)", 900);
+    playTone(90, 0.18, "square", 0.14);
+    updateHud();
+    if (lives <= 0) gameOver();
+    }
+
+    function judgeKeyPress(pressedKey) {
+    if (!isFightActive) return;
+    const lane = LANE_KEYS.indexOf(pressedKey);
+    if (lane < 0) return;
+
+    keyElements[lane].classList.add("active");
+    setTimeout(() => keyElements[lane].classList.remove("active"), 100);
+
+    const pressTime = getAudioClockTime() + CONFIG.inputOffsetSeconds;
+    let closestNote = null;
+    let smallestTimeDifference = Infinity;
+    for (const note of activeNotes) {
+        if (note.lane !== lane) continue;
+        const timeDifference = Math.abs(pressTime - note.hitTime);
+        if (timeDifference < smallestTimeDifference) {
+        smallestTimeDifference = timeDifference;
+        closestNote = note;
+        }
+    }
+
+    if (closestNote && smallestTimeDifference <= hitWindowSeconds) {
+        currentCombo++;
+        bestCombo = Math.max(bestCombo, currentCombo);
+        bossHealth = Math.max(0, bossHealth - damagePerHit);
+        removeNote(closestNote);
+        bossShakeUntil = performance.now() + 200;
+        playTone(620, 0.09, "triangle", 0.13);
+        const rating = smallestTimeDifference <= CONFIG.perfectWindowSeconds ? "PERFECT!" : "GOOD!";
+        showFeedback(`${rating} -${Math.round(damagePerHit * 10) / 10} HP`, "var(--color-green)");
+        updateHud();
+        if (bossHealth <= 0.001) defeatBoss();
+    } else {
+        loseLife(closestNote ? "BAD TIMING" : "WRONG KEY");
+    }
+    }
+
+    function runFrame() {
+    if (isFightActive) {
+        const currentTime = getAudioClockTime();
+
+        while (currentTime >= songStartTime + nextNoteBeatNumber * secondsPerBeat - travelDurationSeconds) {
+        spawnNoteWave(songStartTime + nextNoteBeatNumber * secondsPerBeat);
+        nextNoteBeatNumber += noteSpacingBeats;
+        }
+
+        const hitLineTop = hitLineElement.getBoundingClientRect().top;
+        for (const note of [...activeNotes]) {
+        const fallProgress = 1 - (note.hitTime - currentTime) / travelDurationSeconds;
+        note.element.style.top = (-40 + (hitLineTop + 40) * fallProgress) + "px";
+        if (currentTime > note.hitTime + hitWindowSeconds) {
+            removeNote(note);
+            loseLife("MISSED NOTE");
+            if (!isFightActive) break;
+        }
+        }
+
+        const currentBeat = Math.floor((currentTime - songStartTime) / secondsPerBeat);
+        if (currentBeat >= 0 && performance.now() > feedbackHoldUntil) {
+        feedbackElement.style.color = "var(--color-cyan)";
+        feedbackElement.textContent = ["Feel the beat", "Stay in time", "Hit the notes", "Keep going"][currentBeat % 4];
+        }
+    }
+
+    animateBoss();
+    requestAnimationFrame(runFrame);
+    }
+
+    async function startGame() {
+    isBusy = true;
+    document.activeElement.blur();
+    if (!setupAudio()) {
+        isBusy = false;
+        return;
+    }
+
+    const song = await loadSong(selectedStageIndex);
+    playbackMode = song.mode;
+    songBuffer = song.buffer;
+    songAudioElement = song.audioElement;
+
+    stopMusic();
+    clearAllNotes();
+    applyDifficultyForCurrentLevel();
+    playSong();
+    nextDrumBeatTime = songStartTime;
+    drumBeatIndex = 0;
+    isMusicPlaying = true;
+    scheduleDrumBeats();
+    musicSchedulerInterval = setInterval(scheduleDrumBeats, 25);
+    soundStatusElement.textContent = playbackMode === "none" ? "♪ BEAT PLAYING" : "♪ MUSIC PLAYING";
+    beginBossFight();
+    }
+
+    function beginBossFight() {
+    applyDifficultyForCurrentLevel();
+    clearAllNotes();
+    bossHealth = 100;
+    lives = CONFIG.startingLives;
+    currentCombo = 0;
+    overlayElement.hidden = true;
+    applyBossAppearance();
+    updateHud();
+    const currentBeatNumber = (getAudioClockTime() - songStartTime) / secondsPerBeat;
+    nextNoteBeatNumber = Math.ceil((currentBeatNumber + travelDurationBeats) / noteSpacingBeats) * noteSpacingBeats;
+    showFeedback(`BOSS ${bossLevel} · GET READY`, "var(--color-cyan)", 1200);
+    isFightActive = true;
+    isBusy = false;
+    }
+
+    function buildStagePicker() {
+    const stagePicker = getById("stagePicker");
+    STAGES.forEach((stage, stageIndex) => {
+        const stageButton = document.createElement("button");
+        stageButton.className = "stage-card";
+        stageButton.dataset.stage = stageIndex;
+        stageButton.setAttribute("role", "radio");
+        const fileName = stage.audioPath ? stage.audioPath.split("/").pop() : "built-in beat";
+        stageButton.innerHTML = `<b>${stage.label}</b><span>${fileName} · ${stage.beatsPerMinute} BPM</span>`;
+        stageButton.addEventListener("click", () => selectStage(stageIndex));
+        stagePicker.appendChild(stageButton);
+    });
+    selectStage(0, true);
+    }
+
+    function selectStage(stageIndex, isInitialSelection = false) {
+    if (isFightActive || isBusy) return;
+    selectedStageIndex = stageIndex;
+    [...getById("stagePicker").children].forEach((stageButton, buttonIndex) => {
+        stageButton.setAttribute("aria-checked", buttonIndex === stageIndex);
+    });
+    applyDifficultyForCurrentLevel();
+    if (isInitialSelection) return;
+    soundStatusElement.textContent = `♪ ${STAGES[stageIndex].label} ready`;
+    if (setupAudio()) loadSong(stageIndex);
+    }
+
+    document.addEventListener("keydown", event => {
+    const pressedKey = event.key.toLowerCase();
+    if (LANE_KEYS.includes(pressedKey)) {
+        event.preventDefault();
+        if (!event.repeat) judgeKeyPress(pressedKey);
+    }
+    });
+
+    keyElements.forEach((keyElement, lane) => {
+    keyElement.addEventListener("pointerdown", event => {
+        event.preventDefault();
+        judgeKeyPress(LANE_KEYS[lane]);
+    });
+    });
+
+    overlayElement.addEventListener("click", event => {
+    if (event.target.closest("#stagePicker")) return;
+    if (!isFightActive && !isBusy) startGame();
+    });
+
+    buildStagePicker();
+    applyBossAppearance();
+    updateHud();
+    requestAnimationFrame(runFrame);
+    </script>
+    </body>
 </html>
